@@ -150,12 +150,12 @@ nav .container {
   bottom: -4px; /* Distance below the text */
   width: 0;
   height: 2px;
-  background: #5C33C4;
+  background: var(--color-primary);
   transition: width 0.3s ease;
 }
 
 .nav-links a:hover {
-  color: #5C33C4;
+  color: var(--color-primary);
   text-shadow: 0 0 24px #fff6;
 }
 
