@@ -5,5 +5,6 @@
 ---
 
 main branch is hosted to
-https://sarmad-studio.github.io/website/ 
+https://sarmad-studio.github.io/website/
+and
 https://tartarus-studio.pages.dev/en/
