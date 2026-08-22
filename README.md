@@ -1,9 +1,9 @@
-# Tartarus Studio website
+# Sarmad Studio website
 
-> https://tartarus.studio
+> https://sarmad.studio
 
 ---
 
 main branch is hosted to
-https://tartarus-studio.github.io/website/ 
+https://sarmad-studio.github.io/website/ 
 https://tartarus-studio.pages.dev/en/
