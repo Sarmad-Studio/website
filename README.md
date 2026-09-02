@@ -4,7 +4,7 @@
   <p>Immersive Experiences</p>
 </div>
 
-## Sarmad Studio website <a target="_blank" href="https://status.sarmad.studio"><img alt="Uptime Badge" src="https://uptime.betterstack.com/status-badges/v3/monitor/2trjb.svg"></a>
+## Sarmad Studio website [![Uptime Badge](https://uptime.betterstack.com/status-badges/v3/monitor/2trjb.svg)](https://status.sarmad.studio)
 
 > https://sarmad.studio
 
