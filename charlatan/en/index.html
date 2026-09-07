@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Charlatan - Social Deduction Game made by Sarmad Studio">
+  <meta name="keywords" content="Sarmad Studio, game, indie, social-deduction">
+  <meta name="author" content="Sarmad Studio">
+  <meta name="robots" content="index, follow">
+  <meta name="theme-color" content="#6333cc">
+  <meta name="color-scheme" content="dark">
+
+  <meta property="og:type" content="game">
+  <meta property="og:url" content="https://sarmad.studio/charlatan/">
+  <meta property="og:description" content="Social Deduction Game made by Sarmad Studio.">
+  <meta property="og:image" content="https://sarmad.studio/assets/social-image.webp">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:site_name" content="Sarmad Studio">
+  <meta property="og:locale" content="en_US">
+
+  <meta property="twitter:card" content="summary_large_image">
+  <meta property="twitter:url" content="https://sarmad.studio/charlatan/">
+  <meta property="twitter:title" content="Charlatan - Sarmad Studio">
+  <meta property="twitter:description" content="Social Deduction Game made by Sarmad Studio.">
+  <meta property="twitter:image" content="https://sarmad.studio/assets/social-image.webp">
+  <meta property="twitter:site" content="@sarmad_studio">
+  <meta property="twitter:creator" content="@Spirit_njm">
+
+  <title>Charlatan</title>
+
+  <link rel="alternate" hreflang="en" href="https://sarmad.studio/charlatan/en/" />
+  <link rel="alternate" hreflang="ar" href="https://sarmad.studio/charlatan/ar/" />
+  <link rel="alternate" hreflang="x-default" href="https://sarmad.studio/charlatan/" />
+
+  <link rel="preload" href="/assets/fonts/inter-ext.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/assets/fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="/assets/fonts/orbitron.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../style.css">
+  <link rel="icon" type="image/x-icon" href="/icon.ico" sizes="any">
+  <link rel="icon" type="image/webp" href="/icon.webp">
+</head>
+
+<body>
+  <div class="bg"></div>
+
+  <div id="connection-status" data-state="disconnected">
+    <span class="status-dot"></span>
+    <span id="connection-label">Offline</span>
+  </div>
+
+  <main>
+
+    <section id="view-lobby" class="view" data-view="lobby">
+      <div class="wordmark">
+        <h1>Charlatan</h1>
+      </div>
+
+      <div id="lobby-entry" class="terminal-frame">
+        <div class="mode-tabs" role="tablist">
+          <button class="mode-tab" data-mode="join" role="tab" aria-selected="true">Join a Room</button>
+          <button class="mode-tab" data-mode="create" role="tab" aria-selected="false">Start a Room</button>
+        </div>
+
+        <form id="entry-form">
+          <div class="field">
+            <label for="user-name">Your Callsign (name)</label>
+            <input id="user-name" name="user_name" type="text" maxlength="24" placeholder="Player">
+          </div>
+
+          <div class="field field-collapse" id="room-code-field">
+            <div>
+              <label for="room-code">Room code</label>
+              <input id="room-code" name="room_code" class="code" type="text" maxlength="32" placeholder="ABC123"
+                autocomplete="off" required>
+            </div>
+          </div>
+
+          <button type="submit" id="entry-submit" class="btn btn-primary">Board the Ship</button>
+        </form>
+      </div>
+
+      <div id="lobby-roster" class="terminal-frame hidden">
+        <div class="room-code-block">
+          <div class="label">Room Code</div>
+          <div class="code" id="room-code-display">——————</div>
+        </div>
+
+        <ul id="roster-list" class="roster-list">
+          <li class="roster-empty">Waiting for the crew to assemble…</li>
+        </ul>
+
+        <button type="button" id="voice-toggle-btn" class="btn btn-ghost">
+          Enable Voice Comms
+        </button>
+
+        <button type="button" id="start-mission-btn" class="btn btn-primary" disabled>
+          Launch
+        </button>
+      </div>
+    </section>
+
+    <section id="view-mission" class="view hidden" data-view="mission">
+
+      <div class="phase-bar">
+        <span class="phase-label" id="phase-label">Mission 01</span>
+        <span class="phase-timer" id="phase-timer">00:00</span>
+      </div>
+
+      <div class="role-card terminal-frame" id="role-card">
+        <div class="role-icon" id="role-icon">?</div>
+        <div>
+          <div class="role-name" id="role-name">Unassigned</div>
+          <div class="role-team" id="role-team">Awaiting role assignment</div>
+          <p class="role-objective" id="role-objective">
+            The server will assign your role and objective once the mission begins.
+          </p>
+        </div>
+      </div>
+
+      <div class="task-shell terminal-frame">
+        <div class="task-title" id="task-title">Standing By</div>
+        <p class="task-hint" id="task-hint">The control panel will update as the server pushes new phase data.</p>
+        <div class="task-body" id="task-body">No active task</div>
+        <button type="button" id="task-submit" class="btn btn-primary hidden">Submit</button>
+      </div>
+
+      <div class="player-strip" id="player-strip"></div>
+    </section>
+
+  </main>
+
+  <script type="module" src="../game.js"></script>
+</body>
+
+</html>
