@@ -181,7 +181,7 @@ class GameApp {
       }
     }
 
-    this.dom.startMissionBtn.disabled = this.players.size < 4;
+    this.dom.startMissionBtn.disabled = this.players.size < 3;
     this.#renderPlayerStrip();
   }
 
