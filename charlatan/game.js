@@ -119,7 +119,7 @@ class GameApp {
     });
 
     this.dom.startMissionBtn.addEventListener('click', () => {
-      this.net.send('start_game', {});
+      this.net.send('game_start', {});
     });
 
     this.dom.voiceToggleBtn.addEventListener('click', async () => {
