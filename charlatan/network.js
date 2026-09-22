@@ -27,6 +27,8 @@ function nextSnowflake() {
 }
 
 export class CharlatanNetwork extends Emitter {
+  #pingInterval = null;
+
   constructor({ baseUrl, wsBaseUrl }) {
     super();
     this.baseUrl = baseUrl.replace(/\/$/, '');
@@ -96,6 +98,7 @@ export class CharlatanNetwork extends Emitter {
     this.ws.addEventListener('open', () => {
       this._reconnectAttempt = 0;
       this.#setConnectionState('connected');
+      this.#startHeartbeat();
     });
 
     this.ws.addEventListener('message', (evt) => {
@@ -103,6 +106,7 @@ export class CharlatanNetwork extends Emitter {
     });
 
     this.ws.addEventListener('close', () => {
+      this.#stopHeartbeat();
       if (this._manualClose) {
         this.#setConnectionState('disconnected');
         return;
@@ -112,8 +116,25 @@ export class CharlatanNetwork extends Emitter {
     });
 
     this.ws.addEventListener('error', () => {
+      this.#stopHeartbeat();
       this.#setConnectionState('error');
     });
+  }
+
+  #startHeartbeat() {
+    this.#stopHeartbeat();
+    this.#pingInterval = setInterval(() => {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.send('ping', {});
+      }
+    }, 15000);
+  }
+
+  #stopHeartbeat() {
+    if (this.#pingInterval !== null) {
+      clearInterval(this.#pingInterval);
+      this.#pingInterval = null;
+    }
   }
 
   #handleMessage(raw) {
@@ -158,6 +179,7 @@ export class CharlatanNetwork extends Emitter {
 
   disconnect() {
     this._manualClose = true;
+    this.#stopHeartbeat();
     this.ws?.close();
   }
 
