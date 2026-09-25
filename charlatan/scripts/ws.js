@@ -4,11 +4,11 @@
 
 import { emit } from './state.js';
 
-const PING_INTERVAL_MS = 15000;      // keep-alive ping
-const RECONNECT_WINDOW_MS = 30000;   // 30s - matches server graceful-reconnect window
+const PING_INTERVAL_MS = 15000;    // keep-alive ping
+const RECONNECT_WINDOW_MS = 30000; // 30s - matches server graceful-reconnect window
 const BACKOFF_BASE_MS = 500;
 const BACKOFF_MAX_MS = 5000;
-const EPOCH = 1712793600000n; // Spirit Epoch 2024-4-11
+const EPOCH = 1712793600000n;      // Spirit Epoch 2024-4-11
 
 let socket = null;
 let ticket = null;
