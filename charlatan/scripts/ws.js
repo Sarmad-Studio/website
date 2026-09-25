@@ -114,8 +114,6 @@ function open() {
     setStatus('connected');
     schedulePing();
     emit('ws_open', {});
-    // ask the server to re-sync state after (re)connect
-    send('session_state_sync', {});
   };
 
   socket.onmessage = (ev) => {
