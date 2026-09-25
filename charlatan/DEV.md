@@ -21,6 +21,7 @@ charlatan/
 │   ├── ws.js           # WebSocket client + envelope (de)serialization
 │   ├── state.js        # in-memory/session store + tiny pub/sub event bus
 │   ├── router.js       # Phase -> screen swap, mounts/unmounts DOM
+│   ├── sfu.js          # SFU voice chat throu /room/{roomId}/sfu/... using CloudFlare
 │   ├── i18n.js         # i18n loader using last dir in URI path as locale name
 │   └── screens/
 │       ├── lobby.js    # Stage "lobby": room code, players, start btn
