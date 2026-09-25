@@ -1,6 +1,7 @@
 import { loadLocale, t, hydrate, localeSwitchHref } from './i18n.js';
 import * as state from './state.js';
 import * as ws from './ws.js';
+import * as router from './router.js';
 
 const API = () => `${location.protocol}//api.${location.host}`;
 
@@ -189,6 +190,7 @@ async function enterRoom(sessionSnapshot) {
     }
 
     wireEvents();
+    router.boot(document.getElementById('screen'));
     ws.connect(roomId, ticket);
   } catch (err) {
     console.error('Failed to obtain ws-ticket:', err);
