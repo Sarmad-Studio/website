@@ -135,13 +135,18 @@ function open() {
 }
 
 /**
- * connect(ticket): opens wss://api.<domain>/charlatan/room/{id}/ws?ticket=...
- * Ticket payload is expected to carry (or the room id is taken from state):
- * accepts either a plain string ticket with roomId passed in, or an object.
+ * Connects to wss://api.<domain>/charlatan/room/{id}/ws?ticket=...
+ * Accepts either (roomId, ticket) or an object { roomId, ticket }.
  */
 export function connect(newRoomId, newTicket) {
-  if (newRoomId !== undefined) roomId = String(newRoomId);
-  if (newTicket !== undefined) ticket = String(newTicket);
+  if (typeof newRoomId === 'object' && newRoomId !== null) {
+    if (newRoomId.roomId !== undefined) roomId = String(newRoomId.roomId);
+    else if (newRoomId.room_id !== undefined) roomId = String(newRoomId.room_id);
+    if (newRoomId.ticket !== undefined) ticket = String(newTicket || newRoomId.ticket);
+  } else {
+    if (newRoomId !== undefined) roomId = String(newRoomId);
+    if (newTicket !== undefined) ticket = String(newTicket);
+  }
   reconnectDeadline = 0;
   reconnectAttempts = 0;
   open();
