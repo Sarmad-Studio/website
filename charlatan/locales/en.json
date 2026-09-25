@@ -1,0 +1,55 @@
+{
+    "gate": {
+        "title": "Charlatan",
+        "subtitle": "Social deduction game",
+        "host": "Create Room",
+        "join": "Join Room",
+        "name_label": "Your Callsign",
+        "name_placeholder": "Player",
+        "code_label": "Room Code",
+        "error": "Could not connect to the room"
+    },
+    "conn": {
+        "offline": "Offline",
+        "connecting": "Connecting",
+        "connected": "Linked",
+        "lost": "Connection lost",
+        "lost_hint": "The uplink dropped and could not be re-established within the reconnect window.",
+        "retry": "Reconnect"
+    },
+    "common": {
+        "round": "Round {n}"
+    },
+    "phase": {
+        "mission": "Mission",
+        "debate": "Debate",
+        "hunter": "Hunter",
+        "voting": "Voting"
+    },
+    "lobby": {
+        "room_code": "Room Code",
+        "share_hint": "Share this code with your crew.",
+        "players": "Crew Manifest",
+        "players_count": "{n} aboard",
+        "waiting": "Awaiting launch orders",
+        "waiting_hint": "The host starts the game once everyone is aboard.",
+        "start": "Start Game",
+        "leave": "Leave Room",
+        "host": "Host"
+    },
+    "role": {
+        "humans": "Humans",
+        "aliens": "Aliens"
+    },
+    "trait": {
+        "captain": "Captain",
+        "hunter": "Hunter"
+    },
+    "ended": {
+        "win": "CREW SECURED THE SHIP",
+        "lose": "THE CHARLATAN WINS",
+        "summary": "Final debrief: roles revealed, votes logged. The ship remembers.",
+        "your_role": "Your role",
+        "play_again": "New Round"
+    }
+}
