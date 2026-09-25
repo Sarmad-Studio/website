@@ -36,8 +36,6 @@ charlatan/
     └── icons/          # inline-svg sources for UI elemnets
 ```
 
-No bundler. `<script type="module" src="/scripts/main.js">` in `index.html`; each screen is an ES module exporting `mount(container, state)` / `unmount()`.
-
 ---
 
 ## 2. Design System (sarmad.studio, sci-fi/terminal variant)
