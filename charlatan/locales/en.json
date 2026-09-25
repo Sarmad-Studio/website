@@ -46,8 +46,8 @@
         "hunter": "Hunter"
     },
     "ended": {
-        "win": "CREW SECURED THE SHIP",
-        "lose": "THE CHARLATAN WINS",
+        "win": "Crew secured the ship",
+        "lose": "The Charlatan wins",
         "summary": "Final debrief: roles revealed, votes logged. The ship remembers.",
         "your_role": "Your role",
         "play_again": "New Round"
