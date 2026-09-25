@@ -58,7 +58,8 @@ export function decode(text) {
 
 function wsUrl(id, tkt) {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${proto}//api.${location.hostname}/charlatan/room/${encodeURIComponent(id)}/ws?ticket=${encodeURIComponent(tkt)}`;
+  const host = location.hostname.startsWith('api.') ? location.host : `api.${location.host}`;
+  return `${proto}//${host}/charlatan/room/${encodeURIComponent(id)}/ws?ticket=${encodeURIComponent(tkt)}`;
 }
 
 function setStatus(kind) {
