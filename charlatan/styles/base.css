@@ -81,8 +81,8 @@
   --amber: #ffb454;
   --amber-glow: rgba(255, 180, 84, 0.4);
 
-  --font-display: 'Orbitron', ui-monospace, monospace;
-  --font-body: 'Inter', system-ui, sans-serif;
+  --font-display: 'Orbitron', 'Noto Kufi Arabic', ui-monospace, monospace;
+  --font-body: 'Inter', 'Noto Sans Arabic', system-ui, sans-serif;
 
   --radius-sm: 3px;
   --radius-md: 6px;
