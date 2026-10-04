@@ -7,7 +7,7 @@
         "name_label": "شارتك",
         "name_placeholder": "لاعب",
         "code_label": "كود الغرفة",
-        "error": "تعذّر الإتصال بالغرفة"
+        "error": "تعذّر الإتصال بالسيرفر"
     },
     "conn": {
         "offline": "أوفلاين",

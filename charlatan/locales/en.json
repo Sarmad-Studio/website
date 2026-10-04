@@ -7,7 +7,7 @@
         "name_label": "Your Callsign",
         "name_placeholder": "Player",
         "code_label": "Room Code",
-        "error": "Could not connect to the room"
+        "error": "Could not connect to server"
     },
     "conn": {
         "offline": "Offline",
