@@ -179,18 +179,10 @@ async function enterRoom(sessionSnapshot) {
   const user_uuid = state.getOrCreateUserUUID();
   const roomId = s.room.id;
 
-  const fetchTicket = async () => {
-    const tktRes = await api(`/room/${roomId}/ws-ticket`, {
-      method: 'POST',
-      body: JSON.stringify({ user_uuid })
-    });
-    return tktRes.ticket;
-  };
-
   try {
     wireEvents();
     router.boot(document.getElementById('screen'));
-    ws.connect(roomId, fetchTicket);
+    ws.connect(roomId);
   } catch (err) {
     console.error('Failed to initialize ws connection:', err);
     mountGate();

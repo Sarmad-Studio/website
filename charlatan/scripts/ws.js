@@ -12,7 +12,6 @@ const EPOCH = 1712793600000n;      // Spirit Epoch 2024-4-11
 
 let socket = null;
 let ticket = null;
-let ticketFetcher = null;
 let roomId = null;
 let manualClose = false;
 let reconnectDeadline = 0;
@@ -99,6 +98,14 @@ function scheduleReconnect() {
   reconnectTimer = setTimeout(open, delay);
 }
 
+async function fetchTicket() {
+  const tktRes = await api(`/room/${roomId}/ws-ticket`, {
+    method: 'POST',
+    body: JSON.stringify({ user_uuid })
+  });
+  return tktRes.ticket;
+}
+
 async function open() {
   if (!roomId) return;
   manualClose = false;
@@ -111,9 +118,9 @@ async function open() {
   setStatus('connecting');
 
   let activeTicket = ticket;
-  if (typeof ticketFetcher === 'function') {
+  if (!activeTicket) {
     try {
-      activeTicket = await ticketFetcher();
+      activeTicket = await fetchTicket();
       ticket = activeTicket;
     } catch (err) {
       scheduleReconnect();
@@ -159,21 +166,15 @@ if (typeof document !== 'undefined') {
 }
 
 /**
- * Accepts (roomId, ticket, ticketFetcher) or (roomId, ticketFetcher).
+ * Accepts (roomId, ticket)
  */
-export function connect(newRoomId, newTicket, newFetcher) {
+export function connect(newRoomId, newTicket) {
   if (typeof newRoomId === 'object' && newRoomId !== null) {
     roomId = String(newRoomId.roomId || newRoomId.room_id || '');
-    ticketFetcher = typeof newRoomId.ticketFetcher === 'function' ? newRoomId.ticketFetcher : null;
     ticket = typeof newRoomId.ticket === 'string' ? newRoomId.ticket : null;
   } else {
     if (newRoomId !== undefined) roomId = String(newRoomId);
-    if (typeof newTicket === 'function') {
-      ticketFetcher = newTicket;
-    } else {
-      ticket = newTicket ? String(newTicket) : null;
-      ticketFetcher = typeof newFetcher === 'function' ? newFetcher : null;
-    }
+    ticket = newTicket ? String(newTicket) : null;
   }
 
   reconnectDeadline = 0;
