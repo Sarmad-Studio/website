@@ -161,6 +161,7 @@ function mountGate() {
           body: JSON.stringify({ user_uuid, user_name: name, room_code }),
         });
       }
+      if (!data?.room?.id) throw new Error("Invalid server response, try again")
       enterRoom(data);
     } catch (err) {
       errEl.textContent = t('gate.error') + ': ' + err.message;
