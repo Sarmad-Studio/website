@@ -2,7 +2,7 @@ const SESSION_KEY = 'charlatan.session';
 
 const state = {
   room: null,      // { id, code, host_id, stage }
-  session: null,   // server session payload (ticket, phase, round...)
+  session: null,   // server session payload (phase, round...)
   players: [],     // [{ id, name, alive, is_host }]
   self: null,      // player object for this client
   role: null,      // { role, ... } from role_assigned
