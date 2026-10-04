@@ -12,6 +12,7 @@ const EPOCH = 1712793600000n;      // Spirit Epoch 2024-4-11
 
 let socket = null;
 let ticket = null;
+let ticketFetcher = null;
 let roomId = null;
 let manualClose = false;
 let reconnectDeadline = 0;
@@ -31,7 +32,7 @@ function generateSnowflakeID() {
     ID_seq = (ID_seq + 1n) & 16383n; // 14 sequence bits max
     if (ID_seq === 0n) {
       // Busy wait for next millisecond if sequence exhausted
-      while ((now = BigInt(Date.now())) === ID_last_Time) {}
+      while ((now = BigInt(Date.now())) === ID_last_Time) { }
     }
   } else {
     ID_seq = 0n;
@@ -98,15 +99,31 @@ function scheduleReconnect() {
   reconnectTimer = setTimeout(open, delay);
 }
 
-function open() {
-  if (!roomId || !ticket) return;
+async function open() {
+  if (!roomId) return;
   manualClose = false;
+
   if (socket) {
-    try { socket.close(); } catch (_) { /* noop */ }
+    try { socket.close(); } catch (_) { }
     socket = null;
   }
+
   setStatus('connecting');
-  socket = new WebSocket(wsUrl(roomId, ticket));
+
+  let activeTicket = ticket;
+  if (typeof ticketFetcher === 'function') {
+    try {
+      activeTicket = await ticketFetcher();
+      ticket = activeTicket;
+    } catch (err) {
+      scheduleReconnect();
+      return;
+    }
+  }
+
+  if (!activeTicket) return;
+
+  socket = new WebSocket(wsUrl(roomId, activeTicket));
 
   socket.onopen = () => {
     reconnectDeadline = 0;
@@ -129,24 +146,27 @@ function open() {
     if (!manualClose) scheduleReconnect();
   };
 
-  socket.onerror = () => {
-    /* onclose follows and handles retry */
-  };
+  socket.onerror = () => { /* onclose follows and handles retry */ };
 }
 
 /**
- * Connects to wss://api.<domain>/charlatan/room/{id}/ws?ticket=...
- * Accepts either (roomId, ticket) or an object { roomId, ticket }.
+ * Accepts (roomId, ticket, ticketFetcher) or (roomId, ticketFetcher).
  */
-export function connect(newRoomId, newTicket) {
+export function connect(newRoomId, newTicket, newFetcher) {
   if (typeof newRoomId === 'object' && newRoomId !== null) {
-    if (newRoomId.roomId !== undefined) roomId = String(newRoomId.roomId);
-    else if (newRoomId.room_id !== undefined) roomId = String(newRoomId.room_id);
-    if (newRoomId.ticket !== undefined) ticket = String(newTicket || newRoomId.ticket);
+    roomId = String(newRoomId.roomId || newRoomId.room_id || '');
+    ticketFetcher = typeof newRoomId.ticketFetcher === 'function' ? newRoomId.ticketFetcher : null;
+    ticket = typeof newRoomId.ticket === 'string' ? newRoomId.ticket : null;
   } else {
     if (newRoomId !== undefined) roomId = String(newRoomId);
-    if (newTicket !== undefined) ticket = String(newTicket);
+    if (typeof newTicket === 'function') {
+      ticketFetcher = newTicket;
+    } else {
+      ticket = newTicket ? String(newTicket) : null;
+      ticketFetcher = typeof newFetcher === 'function' ? newFetcher : null;
+    }
   }
+
   reconnectDeadline = 0;
   reconnectAttempts = 0;
   open();
@@ -166,7 +186,7 @@ export function close() {
   manualClose = true;
   stopTimers();
   if (socket) {
-    try { socket.close(); } catch (_) { /* noop */ }
+    try { socket.close(); } catch (_) { }
     socket = null;
   }
 }
