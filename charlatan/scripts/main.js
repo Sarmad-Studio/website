@@ -106,14 +106,14 @@ function mountGate() {
 
       <form id="gate-form" style="width: 100%; margin-top: 2rem;">
         <div class="field-group field">
-          <label class="field-label" data-i18n="gate.name_label">Your Callsign</label>
-          <input type="text" name="name" maxlength="24" placeholder="Callsign">
+          <label for="name" class="field-label" data-i18n="gate.name_label">Your Callsign</label>
+          <input type="text" id="name" name="name" maxlength="24" placeholder="Callsign" autocomplete="callsign">
         </div>
 
         <div class="field-collapse" id="code-group">
           <div class="field-group field">
-            <label class="field-label" data-i18n="gate.code_label">Room Code</label>
-            <input type="text" name="code" maxlength="8" placeholder="ABC123" required
+            <label for="code" class="field-label" data-i18n="gate.code_label">Room Code</label>
+            <input type="text" id="code" name="code" maxlength="8" placeholder="ABC123" autocomplete="off" required
                    style="width: 100%;font-family:var(--font-display);letter-spacing:0.2em;text-transform:uppercase">
           </div>
         </div>
