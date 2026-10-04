@@ -27,21 +27,29 @@ function renderConnStatus(kind) {
   box.appendChild(label);
 }
 
-function showLostOverlay() {
-  let ov = document.getElementById('lost-overlay');
+function showErrOverlay(title, msg) {
+  let ov = document.getElementById('err-overlay');
   if (!ov) {
     ov = document.createElement('div');
-    ov.id = 'lost-overlay';
+    ov.id = 'err-overlay';
     ov.className = 'overlay';
     ov.innerHTML = `
       <div class="terminal-frame panel stack" style="max-width:44rem;text-align:center">
-        <h2 data-i18n="conn.lost"></h2>
-        <p class="muted" data-i18n="conn.lost_hint"></p>
-        <button class="btn-primary" id="retry-btn" data-i18n="conn.retry"></button>
+        <h2 data-i18n="${title}"></h2>
+        <p class="muted" data-i18n="${msg}"></p>
+        <div style="display:flex;gap:1rem;justify-content:center">
+          <button class="btn-primary" id="retry-btn" data-i18n="conn.retry">Retry</button>
+          <button class="btn-ghost" id="leave-btn">Leave</button>
+        </div>
       </div>`;
     document.body.appendChild(ov);
     hydrate(ov);
+
     ov.querySelector('#retry-btn').addEventListener('click', () => location.reload());
+    ov.querySelector('#leave-btn').addEventListener('click', () => {
+      state.saveSession(null);
+      location.reload();
+    });
   }
   ov.hidden = false;
 }
@@ -201,7 +209,7 @@ async function boot() {
 
   renderConnStatus('offline');
   state.on('connection_status', renderConnStatus);
-  state.on('connection_lost', showLostOverlay);
+  state.on('connection_lost', () => showErrOverlay("conn.lost", "conn.lost_hint"));
 
   const saved = state.loadSession();
   if (saved && saved.room) {
