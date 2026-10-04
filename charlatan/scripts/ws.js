@@ -187,9 +187,10 @@ export function close() {
   manualClose = true;
   stopTimers();
   if (socket) {
-    try { socket.close(); } catch (_) { }
+    try { socket.close(); } catch (_) { /* noop */ }
     socket = null;
   }
+  setStatus("offline");
 }
 
 export function isConnected() {
