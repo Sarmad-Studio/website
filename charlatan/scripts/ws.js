@@ -62,8 +62,8 @@ function wsUrl(id, tkt) {
   return `${proto}//${host}/charlatan/room/${encodeURIComponent(id)}/ws?ticket=${encodeURIComponent(tkt)}`;
 }
 
+// kind: 'connecting' | 'connected' | 'lost' | 'offline'
 function setStatus(kind) {
-  // kind: 'connecting' | 'connected' | 'lost'
   emit('connection_status', kind);
 }
 
