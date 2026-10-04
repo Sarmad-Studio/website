@@ -116,17 +116,17 @@ async function open() {
 
   setStatus('connecting');
 
-  let activeTicket
+  let ticket
   try {
-    activeTicket = await fetchTicket();
+    ticket = await fetchTicket();
   } catch (err) {
     scheduleReconnect();
     return;
   }
 
-  if (!activeTicket) return;
+  if (!ticket) return;
 
-  socket = new WebSocket(wsUrl(roomId, activeTicket));
+  socket = new WebSocket(wsUrl(roomId, ticket));
 
   socket.onopen = () => {
     reconnectDeadline = 0;
