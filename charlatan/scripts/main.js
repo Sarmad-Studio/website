@@ -92,8 +92,8 @@ function mountGate() {
 
     <div class="terminal-frame panel" style="width: 100%; max-width: 580px; margin: 0 auto; padding: 3.2rem;">
       <div class="mode-tabs" role="tablist">
-        <button class="mode-tab active" id="tab-host" role="tab" data-i18n="gate.host">Host a Room</button>
-        <button class="mode-tab" id="tab-join" role="tab" data-i18n="gate.join">Join by Code</button>
+        <button class="mode-tab active" id="tab-join" role="tab" data-i18n="gate.join">Join by Code</button>
+        <button class="mode-tab" id="tab-host" role="tab" data-i18n="gate.host">Host a Room</button>
       </div>
 
       <form id="gate-form" style="width: 100%; margin-top: 2rem;">
@@ -102,22 +102,22 @@ function mountGate() {
           <input type="text" name="name" maxlength="24" placeholder="Callsign">
         </div>
 
-        <div class="field-collapse is-collapsed" id="code-group">
+        <div class="field-collapse" id="code-group">
           <div class="field-group field">
             <label class="field-label" data-i18n="gate.code_label">Room Code</label>
-            <input type="text" name="code" maxlength="8" placeholder="ABC123"
+            <input type="text" name="code" maxlength="8" placeholder="ABC123" required
                    style="width: 100%;font-family:var(--font-display);letter-spacing:0.2em;text-transform:uppercase">
           </div>
         </div>
 
-        <button class="btn-primary" type="submit" id="gate-submit" style="width: 100%; margin-top: 1rem;" data-i18n="gate.host">Host a Room</button>
+        <button class="btn-primary" type="submit" id="gate-submit" style="width: 100%; margin-top: 1rem;" data-i18n="gate.join">Join Room</button>
       </form>
       <p class="task-status" id="gate-error" role="alert"></p>
     </div>
   `;
   screen.appendChild(hydrate(wrap));
 
-  let mode = 'host';
+  let mode = 'join';
   const form = wrap.querySelector('#gate-form');
   const codeGroup = wrap.querySelector('#code-group');
   const codeInput = form.elements.code;
