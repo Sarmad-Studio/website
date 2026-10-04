@@ -11,7 +11,6 @@ const BACKOFF_MAX_MS = 5000;
 const EPOCH = 1712793600000n;      // Spirit Epoch 2024-4-11
 
 let socket = null;
-let ticket = null;
 let roomId = null;
 let manualClose = false;
 let reconnectDeadline = 0;
@@ -117,15 +116,12 @@ async function open() {
 
   setStatus('connecting');
 
-  let activeTicket = ticket;
-  if (!activeTicket) {
-    try {
-      activeTicket = await fetchTicket();
-      ticket = activeTicket;
-    } catch (err) {
-      scheduleReconnect();
-      return;
-    }
+  let activeTicket
+  try {
+    activeTicket = await fetchTicket();
+  } catch (err) {
+    scheduleReconnect();
+    return;
   }
 
   if (!activeTicket) return;
@@ -166,17 +162,12 @@ if (typeof document !== 'undefined') {
 }
 
 /**
- * Accepts (roomId, ticket)
+ * Accepts (newRoomId)
  */
-export function connect(newRoomId, newTicket) {
-  if (typeof newRoomId === 'object' && newRoomId !== null) {
-    roomId = String(newRoomId.roomId || newRoomId.room_id || '');
-    ticket = typeof newRoomId.ticket === 'string' ? newRoomId.ticket : null;
-  } else {
-    if (newRoomId !== undefined) roomId = String(newRoomId);
-    ticket = newTicket ? String(newTicket) : null;
-  }
+export function connect(newRoomId) {
+  if (newRoomId !== undefined) throw new Error("Faild to get room data")
 
+  roomId = newRoomId;
   reconnectDeadline = 0;
   reconnectAttempts = 0;
   open();
