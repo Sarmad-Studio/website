@@ -15,7 +15,8 @@
         "connected": "Linked",
         "lost": "Connection lost",
         "lost_hint": "The socket dropped and could not be re-established within the reconnect window.",
-        "retry": "Reconnect"
+        "retry": "Reconnect",
+        "ws_init_error": "Failed to initialize WebSocket connection"
     },
     "common": {
         "round": "Round {n}"

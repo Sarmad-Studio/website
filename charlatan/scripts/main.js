@@ -193,7 +193,7 @@ async function enterRoom(session) {
     router.boot(document.getElementById('screen'));
     ws.connect(roomId);
   } catch (err) {
-    console.error('Failed to initialize ws connection:', err);
+    showErrOverlay('conn.ws_init_error', err);
     mountGate();
   }
 }
