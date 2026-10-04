@@ -165,7 +165,7 @@ if (typeof document !== 'undefined') {
  * Accepts (newRoomId)
  */
 export function connect(newRoomId) {
-  if (newRoomId !== undefined) throw new Error("Faild to get room data")
+  if (!newRoomId) throw new Error("Faild to get room data")
 
   roomId = newRoomId;
   reconnectDeadline = 0;
