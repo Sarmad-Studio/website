@@ -14,7 +14,7 @@
         "connecting": "Connecting",
         "connected": "Linked",
         "lost": "Connection lost",
-        "lost_hint": "The uplink dropped and could not be re-established within the reconnect window.",
+        "lost_hint": "The socket dropped and could not be re-established within the reconnect window.",
         "retry": "Reconnect"
     },
     "common": {
