@@ -149,6 +149,15 @@ async function open() {
   socket.onerror = () => { /* onclose follows and handles retry */ };
 }
 
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && isConnected()) {
+      send('ping', {});
+      schedulePing(); // Reset the interval timer so it doesn't double-ping
+    }
+  });
+}
+
 /**
  * Accepts (roomId, ticket, ticketFetcher) or (roomId, ticketFetcher).
  */
