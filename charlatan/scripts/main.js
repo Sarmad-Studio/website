@@ -169,11 +169,11 @@ function mountGate() {
   });
 }
 
-async function enterRoom(sessionSnapshot) {
+async function enterRoom(session) {
   const s = state.getState();
-  s.room = sessionSnapshot.room;
-  s.session = sessionSnapshot;
-  s.players = sessionSnapshot.room.users ? sessionSnapshot.room.users.map(id => ({ id })) : [];
+  s.room = session.room;
+  s.session = session;
+  s.players = session.room.users ? session.room.users.map(id => ({ id })) : [];
   state.saveSession();
 
   const user_uuid = state.getOrCreateUserUUID();
