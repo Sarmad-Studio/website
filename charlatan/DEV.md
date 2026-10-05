@@ -18,6 +18,7 @@ charlatan/
 │   └── screens.css     # per-phase screen styles
 ├── scripts/
 │   ├── main.js         # entry: gate (create/join), resume after reload, leave, overlays, boots router
+│   ├── api.js          # fetch wrapper (timeout, ApiError{status}), post() adds user_uuid, api host
 │   ├── ws.js           # WebSocket client: ticket minting, reconnect, envelope (de)serialization
 │   ├── state.js        # in-memory store + pub/sub bus + server-event -> state reducers
 │   ├── router.js       # Phase -> screen swap, mounts/unmounts DOM
