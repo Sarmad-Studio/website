@@ -21,6 +21,7 @@ charlatan/
 │   ├── api.js          # fetch wrapper (timeout, ApiError{status}), post() adds user_uuid, api host
 │   ├── ws.js           # WebSocket client: ticket minting, reconnect, envelope (de)serialization
 │   ├── state.js        # in-memory store + pub/sub bus + server-event -> state reducers
+│   ├── util.js         # el() DOM helper, tr() = t() with fallback text
 │   ├── router.js       # Phase -> screen swap, mounts/unmounts DOM
 │   ├── sfu.js          # SFU voice chat throu /room/{roomId}/sfu/... using CloudFlare
 │   ├── i18n.js         # i18n loader using last dir in URI path as locale name
