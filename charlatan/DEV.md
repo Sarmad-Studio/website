@@ -91,11 +91,16 @@ Same foundation as the marketing site (dark grid bg, Orbitron headers, Inter bod
 
 `state.js` holds a single plain object:
 ```js
-{ room, session, players, self, role, trait, task, votes }
+{ room, session, players, self, selfId, role, trait, mission, task, votes, ejected }
 ```
+- `room`: Room (ids normalized to strings). `session`: `{ phase, started_at }` (room lives in `room`).
+- `players`: `[{ id, name, connected }]`; `self` is derived from `selfId` (set by `connect`, or `room.owner_id` right after create).
+- `bindServerEvents()` (called once from `main.js`) maps `ws:*` events onto state: `session_state_sync`, `player_joined/left`, `disconnect`, `owner_changed`, `phase_change`, `role_assigned`, `task`, `vote_result`, `error` (-> `notice`), `room_closed`.
+- Persisted per tab in `sessionStorage` as `{ room:{id,join_code}, selfId }` so a reload resumes; membership is validated by the ws-ticket request.
+- Bus events screens may use: `state_sync`, `players_update`, `room_update`, `self`, `phase_change`, `role_assigned`, `task`, `mission_started`, `vote_result`, `notice`, `connection_status`.
 Small pub/sub (`on(event, fn)` / `emit(event, data)`) with no reactive framework needed at this scale.
 
-`router.js` listens for `phase_change` (and `stage` on `session_state_sync`) and swaps the mounted screen module:
+`router.js` listens for `phase_change` and `state_sync` and swaps the mounted screen module. Phase wins, stage is the fallback (`phase_change` carries no stage); screens are mounted as `mount(container, state)` and torn down with `unmount()`:
 
 | Stage / Phase | Screen Module  |
 |---------------|----------------|
