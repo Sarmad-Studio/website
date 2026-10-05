@@ -121,11 +121,13 @@ Wraps the envelope from server exactly:
 { event, payload, id }
 ```
 Responsibilities:
-- `connect(ticket)`: opens `wss://api.<domain>/charlatan/room/{id}/ws?ticket=...`.
-- `send(event, payload)`: auto-generates snowflake `id`.
-- Dispatches incoming events through `state.js`'s bus (`ws:<event_name>`).
-- **Reconnect**: on drop, retry with backoff for 30s (matches server's graceful-reconnect window) before showing a "connection lost" screen.
-- `ping` sent every ~20s to keep the connection alive.
+- `connect(roomId)`: mints a ticket (`POST /room/{id}/ws-ticket`, single-use, 60s) on **every** attempt, then opens `wss://api.<domain>/charlatan/room/{id}/ws?ticket=...`. `resume()` retries after `connection_lost`; `close()` stops everything.
+- `send(event, payload)`: auto-generates snowflake `id`; returns `false` (and emits `ws_send_failed`) when not open.
+- Dispatches incoming events through the bus (`ws:<event_name>`).
+- **Reconnect**: backoff with jitter for 30s (server's graceful window), 8s connect timeout, then `connection_lost` (overlay with Retry/Leave). Each socket attempt is generation-guarded so stale `onclose` handlers can't trigger reconnects.
+- **Fatal**: ticket request returning 400/401/403/404 emits `connection_fatal {reason}` (no retry) and the app returns to the gate.
+- **Wake handling**: `online`, `pageshow` (bfcache) and tab-visible-after->20s force a reconnect; the server resyncs via `session_state_sync`.
+- `ping` every 10s. The server only counts application messages (not WS pongs) toward its 90s eviction, and background tabs throttle timers, so keep this well under that.
 
 Each screen only subscribes to the events it cares about (`role_assigned`, `task`, `vote_result`, etc.) and calls `ws.send(...)` for client actions (`action`, `vote_cast`, `game_start`).
 
