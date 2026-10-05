@@ -17,9 +17,9 @@ charlatan/
 │   ├── layout.css      # nav, containers, responsive grid
 │   └── screens.css     # per-phase screen styles
 ├── scripts/
-│   ├── main.js         # entry: connects ws, boots router
-│   ├── ws.js           # WebSocket client + envelope (de)serialization
-│   ├── state.js        # in-memory/session store + tiny pub/sub event bus
+│   ├── main.js         # entry: gate (create/join), resume after reload, leave, overlays, boots router
+│   ├── ws.js           # WebSocket client: ticket minting, reconnect, envelope (de)serialization
+│   ├── state.js        # in-memory store + pub/sub bus + server-event -> state reducers
 │   ├── router.js       # Phase -> screen swap, mounts/unmounts DOM
 │   ├── sfu.js          # SFU voice chat throu /room/{roomId}/sfu/... using CloudFlare
 │   ├── i18n.js         # i18n loader using last dir in URI path as locale name
