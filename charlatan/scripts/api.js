@@ -10,7 +10,9 @@ export class ApiError extends Error {
 }
 
 export function apiHost() {
-  return location.hostname.startsWith('api.') ? location.host : `api.${location.host}`;
+  if (location.host.startsWith('api')) return location.host;
+  if (location.host.endsWith('.local')) return `api-${location.host}`;
+  return `api.${location.host}`;
 }
 
 export function apiOrigin() {
