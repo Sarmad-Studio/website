@@ -7,180 +7,199 @@
  */
 
 import { emit } from './state.js';
+import { post, apiHost, ApiError } from './api.js';
 
-const PING_INTERVAL_MS = 15000;    // keep-alive ping
-const RECONNECT_WINDOW_MS = 30000; // 30s - matches server graceful-reconnect window
-const BACKOFF_BASE_MS = 500;
-const BACKOFF_MAX_MS = 5000;
+const PING_MS = 10000;             // server evicts after 90s without an app-level message
+const RECONNECT_WINDOW_MS = 30000;
+const CONNECT_TIMEOUT_MS = 8000;
+const BACKOFF_BASE_MS = 300;
+const BACKOFF_MAX_MS = 3000;
+const STALE_HIDDEN_MS = 20000;     // tab hidden longer than this -> socket may be frozen, reopen
 const EPOCH = 1712793600000n;      // Spirit Epoch 2024-4-11
 
-let socket = null;
+let sock = null;
 let roomId = null;
-let manualClose = false;
-let reconnectDeadline = 0;
-let reconnectAttempts = 0;
-let pingTimer = null;
-let reconnectTimer = null;
-let ID_last_Time = 0n;
-let ID_seq = 0n;
+let wantOpen = false;
+let fetching = false;
+let gen = 0;                       // invalidates in-flight open() calls
+let deadline = 0;
+let attempts = 0;
+let pingTimer = null, retryTimer = null, connTimer = null;
+let hiddenAt = 0;
+let status = 'offline';
+let idLast = 0n, idSeq = 0n;
 
-/**
- * Generate snowflake id as string.
- */
-function generateSnowflakeID() {
+function snowflake() {
   let now = BigInt(Date.now());
-
-  if (now === ID_last_Time) {
-    ID_seq = (ID_seq + 1n) & 16383n; // 14 sequence bits max
-    if (ID_seq === 0n) {
-      // Busy wait for next millisecond if sequence exhausted
-      while ((now = BigInt(Date.now())) === ID_last_Time) { }
-    }
-  } else {
-    ID_seq = 0n;
-  }
-
-  ID_last_Time = now;
-
-  return String(((now - EPOCH) << 22n) | (1 << 14n) | ID_seq);
+  if (now < idLast) now = idLast; // clock went backwards
+  if (now === idLast) {
+    idSeq = (idSeq + 1n) & 16383n;
+    if (idSeq === 0n) now = idLast + 1n;
+  } else idSeq = 0n;
+  idLast = now;
+  return String(((now - EPOCH) << 22n) | (1n << 14n) | idSeq);
 }
 
-export function encode(event, payload) {
-  return JSON.stringify({ event, payload, id: generateSnowflakeID() });
-}
+export const encode = (event, payload) => JSON.stringify({ event, payload, id: snowflake() });
 
 export function decode(text) {
   try {
-    const msg = JSON.parse(text);
-    if (msg && typeof msg.event === 'string') {
-      return { event: msg.event, payload: msg.payload, id: msg.id };
-    }
-  } catch (_) { /* ignore malformed frames */ }
+    const m = JSON.parse(text);
+    if (m && typeof m.event === 'string') return m;
+  } catch (_) { /* malformed */ }
   return null;
 }
 
-function wsUrl(id, tkt) {
-  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = location.hostname.startsWith('api.') ? location.host : `api.${location.host}`;
-  return `${proto}//${host}/charlatan/room/${encodeURIComponent(id)}/ws?ticket=${encodeURIComponent(tkt)}`;
+function setStatus(k) {
+  if (k === status) return;
+  status = k;
+  emit('connection_status', k);
 }
 
-// kind: 'connecting' | 'connected' | 'lost' | 'offline'
-function setStatus(kind) {
-  emit('connection_status', kind);
+const clearTimers = () => {
+  clearInterval(pingTimer); clearTimeout(retryTimer); clearTimeout(connTimer);
+  pingTimer = retryTimer = connTimer = null;
+};
+
+function closeSock() {
+  const s = sock;
+  sock = null;
+  clearInterval(pingTimer); pingTimer = null;
+  clearTimeout(connTimer); connTimer = null;
+  if (s) {
+    s.onopen = s.onmessage = s.onclose = s.onerror = null;
+    try { s.close(1000); } catch (_) { /* noop */ }
+  }
 }
 
-function stopTimers() {
-  if (pingTimer) clearInterval(pingTimer);
-  if (reconnectTimer) clearTimeout(reconnectTimer);
-  pingTimer = null;
-  reconnectTimer = null;
-}
-
-function schedulePing() {
-  if (pingTimer) clearInterval(pingTimer);
-  pingTimer = setInterval(() => {
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      send('ping', {});
-    }
-  }, PING_INTERVAL_MS);
-}
-
-function scheduleReconnect() {
+function retry() {
+  if (!wantOpen) return;
   const now = Date.now();
-  if (!reconnectDeadline) reconnectDeadline = now;
-  const elapsed = now - reconnectDeadline;
-  if (elapsed >= RECONNECT_WINDOW_MS) {
+  if (!deadline) deadline = now;
+  if (now - deadline >= RECONNECT_WINDOW_MS) {
+    wantOpen = false;
     setStatus('lost');
     emit('connection_lost', {});
     return;
   }
   setStatus('connecting');
-  const delay = Math.min(BACKOFF_BASE_MS * Math.pow(2, reconnectAttempts), BACKOFF_MAX_MS);
-  reconnectAttempts += 1;
-  reconnectTimer = setTimeout(open, delay);
+  const base = Math.min(BACKOFF_BASE_MS * 2 ** attempts, BACKOFF_MAX_MS);
+  attempts += 1;
+  clearTimeout(retryTimer);
+  retryTimer = setTimeout(open, base * (0.75 + Math.random() * 0.5));
 }
 
-async function fetchTicket() {
-  const tktRes = await api(`/room/${roomId}/ws-ticket`, {
-    method: 'POST',
-    body: JSON.stringify({ user_uuid })
-  });
-  return tktRes.ticket;
+function fatal(reason) {
+  wantOpen = false;
+  clearTimers();
+  closeSock();
+  setStatus('offline');
+  emit('connection_fatal', { reason });
 }
 
 async function open() {
-  if (!roomId) return;
-  manualClose = false;
-
-  if (socket) {
-    try { socket.close(); } catch (_) { }
-    socket = null;
-  }
-
+  if (!wantOpen || !roomId) return;
+  const my = ++gen;
+  clearTimeout(retryTimer);
+  closeSock();
   setStatus('connecting');
 
-  let ticket
+  let ticket;
+  fetching = true;
   try {
-    ticket = await fetchTicket();
+    ticket = (await post(`/room/${encodeURIComponent(roomId)}/ws-ticket`, {})).ticket;
   } catch (err) {
-    scheduleReconnect();
-    return;
+    if (my !== gen) return;
+    fetching = false;
+    if (err instanceof ApiError && [400, 401, 403, 404].includes(err.status)) {
+      return fatal(err.status === 404 ? 'room_gone' : 'not_member');
+    }
+    return retry(); // network, 429, 5xx
   }
+  fetching = false;
+  if (my !== gen || !wantOpen) return;
+  if (!ticket) return retry();
 
-  if (!ticket) return;
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  let s;
+  try {
+    s = new WebSocket(`${proto}//${apiHost()}/charlatan/room/${encodeURIComponent(roomId)}/ws?ticket=${encodeURIComponent(ticket)}`);
+  } catch (_) {
+    return retry();
+  }
+  sock = s;
 
-  socket = new WebSocket(wsUrl(roomId, ticket));
+  connTimer = setTimeout(() => { if (sock === s && s.readyState === WebSocket.CONNECTING) { closeSock(); retry(); } }, CONNECT_TIMEOUT_MS);
 
-  socket.onopen = () => {
-    reconnectDeadline = 0;
-    reconnectAttempts = 0;
+  s.onopen = () => {
+    if (sock !== s) return;
+    clearTimeout(connTimer);
+    deadline = 0;
+    attempts = 0;
     setStatus('connected');
-    schedulePing();
+    clearInterval(pingTimer);
+    pingTimer = setInterval(() => send('ping', {}), PING_MS);
     emit('ws_open', {});
   };
-
-  socket.onmessage = (ev) => {
-    const msg = decode(ev.data);
-    if (!msg) return;
-    emit(`ws:${msg.event}`, msg.payload);
+  s.onmessage = (ev) => {
+    if (sock !== s) return;
+    const m = decode(ev.data);
+    if (m) emit(`ws:${m.event}`, m.payload);
   };
-
-  socket.onclose = () => {
-    if (pingTimer) clearInterval(pingTimer);
-    pingTimer = null;
+  s.onclose = () => {
+    if (sock !== s) return;
+    closeSock();
     emit('ws_close', {});
-    if (!manualClose) scheduleReconnect();
+    retry();
   };
-
-  socket.onerror = () => { /* onclose follows and handles retry */ };
+  s.onerror = () => { /* onclose follows */ };
 }
 
-if (typeof document !== 'undefined') {
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && isConnected()) {
-      send('ping', {});
-      schedulePing(); // Reset the interval timer so it doesn't double-ping
-    }
-  });
-}
-
-/**
- * Accepts (newRoomId)
- */
-export function connect(newRoomId) {
-  if (!newRoomId) throw new Error("Faild to get room data")
-
-  roomId = newRoomId;
-  reconnectDeadline = 0;
-  reconnectAttempts = 0;
+// Reopen now if we're not healthy (tab wake, network back)
+function nudge(force = false) {
+  if (!wantOpen) return;
+  if (!force && (fetching || (sock && sock.readyState <= WebSocket.OPEN))) return;
+  attempts = 0;
   open();
 }
 
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', () => nudge(true));
+  window.addEventListener('pageshow', (e) => { if (e.persisted) nudge(true); });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+    const away = hiddenAt ? Date.now() - hiddenAt : 0;
+    hiddenAt = 0;
+    if (!wantOpen) return;
+    if (away > STALE_HIDDEN_MS) nudge(true);
+    else if (isConnected()) send('ping', {});
+    else nudge();
+  });
+}
+
+export function connect(newRoomId) {
+  if (!newRoomId) throw new Error('missing room id');
+  newRoomId = String(newRoomId);
+  if (roomId === newRoomId && wantOpen) return;
+  clearTimers(); closeSock();
+  roomId = newRoomId;
+  wantOpen = true;
+  deadline = 0;
+  attempts = 0;
+  open();
+}
+
+// After 'lost': user clicked retry
+export function resume() {
+  if (!roomId) return;
+  wantOpen = true;
+  deadline = 0;
+  nudge(true);
+}
+
 export function send(event, payload) {
-  const frame = encode(event, payload || {});
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.send(frame);
+  if (sock && sock.readyState === WebSocket.OPEN) {
+    sock.send(encode(event, payload || {}));
     return true;
   }
   emit('ws_send_failed', { event });
@@ -188,15 +207,12 @@ export function send(event, payload) {
 }
 
 export function close() {
-  manualClose = true;
-  stopTimers();
-  if (socket) {
-    try { socket.close(); } catch (_) { /* noop */ }
-    socket = null;
-  }
-  setStatus("offline");
+  wantOpen = false;
+  gen++;
+  clearTimers();
+  closeSock();
+  roomId = null;
+  setStatus('offline');
 }
 
-export function isConnected() {
-  return socket && socket.readyState === WebSocket.OPEN;
-}
+export const isConnected = () => !!sock && sock.readyState === WebSocket.OPEN;
