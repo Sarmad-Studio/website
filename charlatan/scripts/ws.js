@@ -1,5 +1,9 @@
 /*
- * Envelope from server: { event, payload, id }
+ * Envelope both ways: { event, payload, id }
+ * Emits `ws:<event>` for every server event, plus:
+ *   connection_status: connecting | connected | lost | offline
+ *   connection_lost   : retry window exhausted (call resume() to try again)
+ *   connection_fatal  : { reason } server says we don't belong here (room gone / not a member)
  */
 
 import { emit } from './state.js';
