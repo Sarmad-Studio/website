@@ -6,11 +6,12 @@ const ROUTES = { lobby };
 let currentKey = null;
 let currentScreen = null;
 let container = null;
+let unsubs = [];
 
 // `initial` shares the lobby.
 export function resolveKey() {
   const s = getState();
-  const phase = s.session && s.session.phase;
+  const phase = s.session?.phase;
   if (phase === 'initial') return 'lobby';
   if (phase && ROUTES[phase]) return phase;
   const stage = s.room && s.room.stage;
@@ -19,27 +20,33 @@ export function resolveKey() {
 
 export function swap(key) {
   if (key === currentKey) return;
-  if (currentScreen && typeof currentScreen.unmount === 'function') {
-    currentScreen.unmount();
-  }
+  if (currentScreen) currentScreen.unmount();
   container.innerHTML = '';
-  currentScreen = ROUTES[key] || ROUTES.lobby;
+  currentScreen = ROUTES[key];
   currentKey = key;
   currentScreen.mount(container, getState());
 }
 
 export function refresh() {
   if (!currentScreen) return;
-  const key = currentKey;
-  if (currentScreen.unmount) currentScreen.unmount();
+  currentScreen.unmount();
   container.innerHTML = '';
-  currentScreen = ROUTES[key];
   currentScreen.mount(container, getState());
 }
 
 export function boot(mountEl) {
+  stop();
   container = mountEl;
-  on('phase_change', () => swap(resolveKey()));
-  on('stage_change', () => swap(resolveKey()));
-  swap(resolveKey());
+  const go = () => swap(resolveKey());
+  unsubs = [on('phase_change', go), on('state_sync', go)];
+  go();
+}
+
+export function stop() {
+  unsubs.forEach((u) => u());
+  unsubs = [];
+  if (currentScreen) currentScreen.unmount();
+  if (container) container.innerHTML = '';
+  currentScreen = null;
+  currentKey = null;
 }
