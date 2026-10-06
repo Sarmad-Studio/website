@@ -43,7 +43,7 @@
         "player_fallback": "Player {n}",
         "empty_slot": "Empty...",
         "need_more": "{n} more needed to start",
-        "ready": "Crew is ready to launch",
+        "ready": "Ready to launch!",
         "waiting_host": "Awaiting launch orders from host",
         "starting": "Starting…",
         "leave_confirm": "Tap again to leave",
