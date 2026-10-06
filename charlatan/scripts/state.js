@@ -1,15 +1,21 @@
 const SESSION_KEY = 'charlatan.session';
+const UUID_KEY = 'charlatan.user_uuid';
 
-const state = {
-  room: null,      // { id, code, host_id, stage }
-  session: null,   // server session payload (phase, round...)
-  players: [],     // [{ id, name, alive, is_host }]
-  self: null,      // player object for this client
-  role: null,      // { role, ... } from role_assigned
-  trait: null,     // { trait, ... } from role_assigned
-  task: null,      // current Task payload
-  votes: {},       // target_id -> count
-};
+const blank = () => ({
+  room: null,     // { id, join_code, stage, owner_id, max_users, users }
+  session: { phase: 'initial', started_at: null }, // Session minus room (room lives in state.room)
+  players: [],    // [{ id, name, connected }]
+  synced: false,  // got a full session_state_sync on this connection lifetime
+  selfId: null,   // snowflake player id (from `connect` / room.owner_id on create)
+  self: null,     // player object for this client (derived from selfId + players)
+  role: null,
+  trait: null,
+  mission: null,
+  task: null,
+  votes: null,
+  ejected: [],
+});
+const state = blank();
 
 const listeners = new Map(); // event -> Set<fn>
 
@@ -26,94 +32,172 @@ export function off(event, fn) {
 
 export function emit(event, data) {
   const set = listeners.get(event);
-  if (set) for (const fn of [...set]) fn(data);
-  const all = listeners.get('*');
-  if (all) for (const fn of [...all]) fn({ event, data });
+  if (set) for (const fn of [...set]) { try { fn(data); } catch (e) { console.error(event, e); } }
+}
+
+export const getState = () => state;
+
+export const findPlayer = (id) => state.players.find((p) => p.id === String(id)) || null;
+
+export function reset() {
+  Object.assign(state, blank());
 }
 
 export function saveSession() {
   try {
+    if (!state.room) return;
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({
-      room: state.room,
-      session: state.session,
-      selfId: state.self ? state.self.id : null,
+      room: { id: state.room.id, join_code: state.room.join_code },
+      selfId: state.selfId,
     }));
   } catch (_) { /* storage unavailable */ }
 }
 
 export function loadSession() {
-  try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch (_) {
-    return null;
-  }
+  try { return JSON.parse(sessionStorage.getItem(SESSION_KEY)); } catch (_) { return null; }
 }
 
 export function clearSession() {
   try { sessionStorage.removeItem(SESSION_KEY); } catch (_) { /* noop */ }
 }
 
-export function applySync(payload) {
-  if (!payload) return;
-  if (payload.room !== undefined) state.room = payload.room;
-  if (payload.session !== undefined) state.session = payload.session;
-  if (payload.players !== undefined) state.players = payload.players;
-  if (payload.self !== undefined) state.self = payload.self;
-  if (payload.role !== undefined) {
-    state.role = payload.role && payload.role.role !== undefined ? payload.role.role : payload.role;
-  }
-  if (payload.trait !== undefined) state.trait = payload.trait;
-  if (payload.task !== undefined) state.task = payload.task;
-  if (payload.votes !== undefined) state.votes = payload.votes;
-  saveSession();
-  emit('state_sync', payload);
-  if (payload.session && payload.session.phase !== undefined) {
-    emit('phase_change', payload.session.phase);
-  }
+function normPlayer(p) {
+  if (p == null) return null;
+  if (typeof p !== 'object') return { id: String(p) };
+  const id = p.id ?? p.user?.id ?? p.player_id;
+  if (id == null) return null;
+  return { ...p, id: String(id), name: p.name ?? p.user_name ?? '' };
 }
 
-export function upsertPlayer(player) {
-  const idx = state.players.findIndex((p) => p.id === player.id);
-  if (idx >= 0) state.players[idx] = { ...state.players[idx], ...player };
-  else state.players.push(player);
-  if (state.self && state.self.id === player.id) state.self = { ...state.self, ...player };
+function normRoom(r) {
+  return {
+    ...r,
+    id: String(r.id),
+    owner_id: r.owner_id != null ? String(r.owner_id) : null,
+    users: (r.users || []).map(String),
+  };
+}
+
+function refreshSelf() {
+  state.self = state.selfId ? findPlayer(state.selfId) || { id: state.selfId } : null;
+}
+
+// Accepts a Session snapshot: { room, started_at, phase }
+export function applySession(sess) {
+  if (!sess) return;
+  if (sess.room) {
+    state.room = normRoom(sess.room);
+    if (!state.synced && state.room.users.length) {
+      state.players = state.room.users.map((id) => ({ id, name: '' }));
+    }
+  }
+  if (sess.phase !== undefined) state.session.phase = sess.phase;
+  if (sess.started_at !== undefined) state.session.started_at = sess.started_at;
+  refreshSelf();
+  saveSession();
+}
+
+export function setSelf(id) {
+  if (id == null) return;
+  state.selfId = String(id);
+  refreshSelf();
+  saveSession();
+  emit('self', state.selfId);
+}
+
+export function upsertPlayer(raw) {
+  const p = normPlayer(raw);
+  if (!p) return;
+  const i = state.players.findIndex((x) => x.id === p.id);
+  if (i >= 0) state.players[i] = { ...state.players[i], ...p };
+  else state.players.push(p);
+  refreshSelf();
   emit('players_update', state.players);
 }
 
 export function removePlayer(id) {
+  id = String(id);
   state.players = state.players.filter((p) => p.id !== id);
+  if (state.room) state.room.users = state.room.users.filter((u) => u !== id);
+  refreshSelf();
   emit('players_update', state.players);
 }
 
-export function setPhase(phase) {
-  if (state.session) state.session.phase = phase;
-  saveSession();
+function setPhase(phase) {
+  if (phase === undefined) return;
+  state.session.phase = phase;
+  if (phase !== 'mission') state.task = null;
+  if (phase === 'voting') { state.votes = null; state.ejected = []; }
   emit('phase_change', phase);
 }
 
-export function getOrCreateUserUUID() {
-  const LOCAL_KEY = 'charlatan.user_uuid';
-  try {
-    let id = localStorage.getItem(LOCAL_KEY);
-    if (!id || id.length !== 36) {
-      // Generate a random UUID v4
-      id = ([1e7] + -1e3 + -4e3 + -8e3 + -1e11).replace(/[018]/g, c =>
-        (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
-      );
-      localStorage.setItem(LOCAL_KEY, id);
+// Wire server events (ws.js emits `ws:<event>`). Call once.
+let bound = false;
+export function bindServerEvents() {
+  if (bound) return;
+  bound = true;
+
+  on('ws:connect', (p) => setSelf(p && p.player_id));
+
+  on('ws:session_state_sync', (p) => {
+    if (!p) return;
+    applySession(p.session);
+    if (Array.isArray(p.players)) {
+      state.players = p.players.map(normPlayer).filter(Boolean);
+      state.synced = true;
+      refreshSelf();
     }
-    return id;
-  } catch (_) {
-    return '00000000-0000-4000-8000-000000000000';
-  }
+    emit('state_sync', p);
+    emit('phase_change', state.session.phase);
+  });
+
+  on('ws:player_joined', (p) => upsertPlayer({ ...(p && p.player), connected: true }));
+  on('ws:player_left', (p) => p && removePlayer(p.player_id));
+  on('ws:disconnect', (p) => {
+    if (!p || String(p.player_id) === state.selfId) return;
+    const pl = findPlayer(p.player_id);
+    if (pl) upsertPlayer({ id: pl.id, connected: false });
+  });
+  on('ws:owner_changed', (p) => {
+    if (state.room && p) state.room.owner_id = String(p.owner_id);
+    emit('room_update', state.room);
+  });
+
+  on('ws:phase_change', (p) => setPhase(p && p.phase !== undefined ? p.phase : p));
+  on('ws:mission_started', (p) => { state.mission = p && p.mission; emit('mission_started', p); });
+  on('ws:role_assigned', (p) => {
+    if (!p) return;
+    state.role = p.role ?? null;
+    state.trait = p.trait ?? null;
+    emit('role_assigned', p);
+  });
+  on('ws:task', (p) => { state.task = p; emit('task', p); });
+  on('ws:vote_result', (p) => {
+    if (!p) return;
+    state.votes = p.tally ?? null;
+    state.ejected = (p.ejected || []).map(String);
+    emit('vote_result', p);
+  });
+
+  on('ws:error', (p) => emit('notice', (p && p.message) || 'error'));
+  on('ws:room_closed', (p) => emit('room_closed', p));
 }
 
-export function getState() {
-  return state;
+export function getOrCreateUserUUID() {
+  let id = null;
+  try { id = localStorage.getItem(UUID_KEY); } catch (_) { /* ignore */ }
+  if (id && id.length === 36) return id;
+  id = memUUID || (memUUID = makeUUID());
+  try { localStorage.setItem(UUID_KEY, id); } catch (_) { /* memory only */ }
+  return id;
 }
+let memUUID = null; // fallback so storage-less browsers still get a unique id
 
-export function findPlayer(id) {
-  return state.players.find((p) => String(p.id) === String(id)) || null;
+function makeUUID() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 15) | 64;
+  b[8] = (b[8] & 63) | 128;
+  const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
