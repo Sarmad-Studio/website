@@ -1,24 +1,14 @@
 import { t, hydrate } from '../i18n.js';
-import { on, getState, getOrCreateUserUUID } from '../state.js';
+import { on, emit, getState } from '../state.js';
 import * as ws from '../ws.js';
+import { el } from '../util.js';
 
 const MIN_PLAYERS = 3;
 const PALETTE = ['#8b6ef0', '#2ee6a6', '#ffb454', '#4cc9f0', '#f472b6', '#a3e635', '#fb923c', '#60a5fa'];
 
-let root = null;
-let seen = null;
-let starting = false;
-let leaveArmed = false;
-let leaveTimer = null;
+let root = null, seen = null, starting = false, leaveArmed = false, leaveTimer = null;
 const timers = [];
 const subs = [];
-
-function el(tag, cls, text) {
-  const node = document.createElement(tag);
-  if (cls) node.className = cls;
-  if (text !== undefined) node.textContent = text;
-  return node;
-}
 
 const later = (fn, ms) => { const id = setTimeout(fn, ms); timers.push(id); return id; };
 const q = (sel) => root.querySelector(sel);
@@ -30,21 +20,19 @@ function colorFor(id) {
 }
 
 function playerCard(p, i, selfId, hostId) {
-  const id = String(p.id);
   const name = p.name || t('lobby.player_fallback', { n: i + 1 });
-  const offline = p.alive === false || p.connected === false;
-  const isNew = seen && !seen.has(id);
+  const offline = p.connected === false;
+  const isNew = seen && !seen.has(p.id);
 
   const li = el('li', 'lobby-player' + (offline ? ' is-offline' : '') + (isNew ? ' is-new' : ''));
-  li.style.setProperty('--c', colorFor(id));
-
-  li.appendChild(el('span', 'avatar', Array.from(name)[0].toUpperCase()));
+  li.style.setProperty('--c', colorFor(p.id));
+  li.appendChild(el('span', 'avatar', (Array.from(name)[0] || '?').toUpperCase()));
 
   const info = el('span', 'info');
   info.appendChild(el('span', 'name', name));
   const tags = el('span', 'tags');
-  if (id === selfId) tags.appendChild(el('span', 'tag tag-you', t('lobby.you')));
-  if (id === hostId) tags.appendChild(el('span', 'tag tag-host', t('lobby.host')));
+  if (p.id === selfId) tags.appendChild(el('span', 'tag tag-you', t('lobby.you')));
+  if (p.id === hostId) tags.appendChild(el('span', 'tag tag-host', t('lobby.host')));
   if (tags.childNodes.length) info.appendChild(tags);
   li.appendChild(info);
 
@@ -57,21 +45,20 @@ function playerCard(p, i, selfId, hostId) {
 function render() {
   if (!root) return;
   const s = getState();
-  const players = s.players || [];
-  const selfId = String((s.self && s.self.id) ?? getOrCreateUserUUID());
-  const hostId = s.room && s.room.host_id !== undefined ? String(s.room.host_id) : null;
-  const isHost = hostId !== null && hostId === selfId;
+  const players = s.players;
+  const selfId = s.selfId;
+  const hostId = s.room ? s.room.owner_id : null;
+  const isHost = !!hostId && hostId === selfId;
   const missing = Math.max(0, MIN_PLAYERS - players.length);
   const ready = missing === 0;
+  const online = ws.isConnected();
 
-  // Room code tiles
   const code = (s.room && s.room.join_code) || '';
   const codeEl = q('#room-code');
   codeEl.replaceChildren(...Array.from(code || '------').map((c) => el('span', 'code-char' + (code ? '' : ' is-empty'), c)));
   codeEl.setAttribute('aria-label', code);
   q('#copy-btn').disabled = !code;
 
-  // Roster: joined players, then placeholder seats up to the minimum
   const cards = players.map((p, i) => playerCard(p, i, selfId, hostId));
   const slots = Array.from({ length: missing }, () => {
     const li = el('li', 'lobby-slot');
@@ -80,24 +67,23 @@ function render() {
     return li;
   });
   q('.lobby-roster').replaceChildren(...cards, ...slots);
-  seen = new Set(players.map((p) => String(p.id)));
+  seen = new Set(players.map((p) => p.id));
 
-  // Count + meter
   q('.player-count').textContent = t('lobby.players_count', { n: players.length });
   const meter = q('.lobby-meter');
   meter.classList.toggle('is-full', ready);
   meter.firstElementChild.style.width = `${Math.min(100, (players.length / MIN_PLAYERS) * 100)}%`;
   meter.setAttribute('aria-valuenow', String(players.length));
 
-  // Status line + host controls
-  q('.lobby-status .dot').className = `dot ${ready && isHost ? 'green' : 'amber'}`;
-  q('.lobby-status .text').textContent = !isHost
-    ? t('lobby.waiting_host')
-    : ready ? t('lobby.ready') : t('lobby.need_more', { n: missing });
+  q('.lobby-status .dot').className = `dot ${online && ready && isHost ? 'green' : 'amber'}`;
+  q('.lobby-status .text').textContent = !online
+    ? t('conn.connecting')
+    : !isHost ? t('lobby.waiting_host')
+      : ready ? t('lobby.ready') : t('lobby.need_more', { n: missing });
 
   const startBtn = q('#start-btn');
   startBtn.hidden = !isHost;
-  startBtn.disabled = !ready || starting;
+  startBtn.disabled = !ready || starting || !online;
   startBtn.textContent = starting ? t('lobby.starting') : t('lobby.start');
 }
 
@@ -115,6 +101,7 @@ async function copyCode() {
     sel.addRange(range);
     return;
   }
+  if (!root) return;
   btn.textContent = t('lobby.copied');
   btn.classList.add('is-done');
   later(() => { btn.textContent = t('lobby.copy_code'); btn.classList.remove('is-done'); }, 1600);
@@ -123,7 +110,7 @@ async function copyCode() {
 function shareCode() {
   const code = (getState().room || {}).join_code;
   if (!code || !navigator.share) return;
-  navigator.share({ title: 'Charlatan', text: `${t('lobby.share_text')} ${code}`, url: location.href }).catch(() => {});
+  navigator.share({ title: 'Charlatan', text: `${t('lobby.share_text')} ${code}`, url: location.href }).catch(() => { });
 }
 
 function onLeave() {
@@ -135,9 +122,7 @@ function onLeave() {
     leaveTimer = later(disarmLeave, 3000);
     return;
   }
-  ws.close();
-  sessionStorage.removeItem('charlatan.session');
-  location.reload();
+  emit('request_leave'); // main.js: POST /leave, close socket, back to gate
 }
 
 function disarmLeave() {
@@ -151,18 +136,15 @@ function disarmLeave() {
 
 function onStart() {
   if (starting) return;
+  if (!ws.send('game_start', {})) { emit('notice', t('conn.lost')); return; }
   starting = true;
-  ws.send('game_start', {});
   render();
-  // If the phase doesn't change, let the host try again.
-  later(() => { starting = false; render(); }, 4000);
+  later(() => { starting = false; render(); }, 4000); // phase didn't change: let the host retry
 }
 
 export default {
   mount(container) {
-    starting = false;
-    leaveArmed = false;
-    seen = null;
+    starting = false; leaveArmed = false; seen = null;
 
     root = el('div', 'stack lobby-screen');
     root.innerHTML = `
@@ -202,24 +184,21 @@ export default {
         </ul>
       </details>
     `;
-    hydrate(root); // must run after innerHTML so data-i18n nodes exist
+    hydrate(root);
     container.appendChild(root);
 
     q('#copy-btn').textContent = t('lobby.copy_code');
     q('#leave-btn').textContent = t('lobby.leave');
     if (navigator.share) q('#share-btn').hidden = false;
-
     q('#copy-btn').addEventListener('click', copyCode);
     q('#share-btn').addEventListener('click', shareCode);
     q('#leave-btn').addEventListener('click', onLeave);
     q('#start-btn').addEventListener('click', onStart);
 
     render();
-
-    subs.push(on('players_update', render));
-    subs.push(on('ws:player_joined', render));
-    subs.push(on('ws:player_left', render));
-    subs.push(on('state_sync', render));
+    for (const ev of ['players_update', 'state_sync', 'room_update', 'self', 'connection_status']) {
+      subs.push(on(ev, render));
+    }
   },
 
   unmount() {
