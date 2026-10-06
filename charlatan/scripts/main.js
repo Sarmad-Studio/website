@@ -2,17 +2,9 @@ import { loadLocale, t, hydrate, localeSwitchHref } from './i18n.js';
 import * as state from './state.js';
 import * as ws from './ws.js';
 import * as router from './router.js';
+import { post, ApiError } from './api.js';
 
-const API = () => `${location.protocol}//api.${location.host}`;
-
-async function api(path, opts) {
-  const res = await fetch(`${API()}/charlatan${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...opts,
-  });
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-  return res.json();
-}
+const screenEl = () => document.getElementById('screen');
 
 function renderConnStatus(kind) {
   const box = document.getElementById('connection-status');
@@ -23,11 +15,20 @@ function renderConnStatus(kind) {
   const label = document.createElement('span');
   label.className = 'label';
   label.textContent = t(`conn.${kind || 'offline'}`);
-  box.appendChild(dot);
-  box.appendChild(label);
+  box.append(dot, label);
 }
 
-function showErrOverlay(title, msg) {
+function toast(msg) {
+  const n = document.createElement('div');
+  n.className = 'toast';
+  n.setAttribute('role', 'status');
+  n.textContent = msg;
+  n.style.cssText = 'position:fixed;left:50%;bottom:1.5rem;transform:translateX(-50%);z-index:50;padding:.8rem 1.4rem;background:var(--panel-bg,#1b1b24);border:1px solid currentColor';
+  document.body.appendChild(n);
+  setTimeout(() => n.remove(), 4000);
+}
+
+function showLostOverlay() {
   let ov = document.getElementById('err-overlay');
   if (!ov) {
     ov = document.createElement('div');
@@ -35,59 +36,73 @@ function showErrOverlay(title, msg) {
     ov.className = 'overlay';
     ov.innerHTML = `
       <div class="terminal-frame panel stack" style="max-width:44rem;text-align:center">
-        <h2 data-i18n="${title}"></h2>
-        <p class="muted" data-i18n="${msg}"></p>
+        <h2 data-i18n="conn.lost"></h2>
+        <p class="muted" data-i18n="conn.lost_hint"></p>
         <div style="display:flex;gap:1rem;justify-content:center">
           <button class="btn-primary" id="retry-btn" data-i18n="conn.retry">Retry</button>
-          <button class="btn-ghost" id="leave-btn">Leave</button>
+          <button class="btn-ghost" id="leave-btn"></button>
         </div>
       </div>`;
     document.body.appendChild(ov);
     hydrate(ov);
-
-    ov.querySelector('#retry-btn').addEventListener('click', () => location.reload());
-    ov.querySelector('#leave-btn').addEventListener('click', () => {
-      state.saveSession(null);
-      location.reload();
-    });
+    ov.querySelector('#leave-btn').textContent = t('lobby.leave', 'Leave');
+    ov.querySelector('#retry-btn').addEventListener('click', () => { hideOverlay(); ws.resume(); });
+    ov.querySelector('#leave-btn').addEventListener('click', leaveRoom);
   }
   ov.hidden = false;
 }
-
-function wireEvents() {
-  state.on('ws:session_state_sync', (payload) => {
-    state.applySync(payload);
-    if (payload && payload.stage !== undefined) state.emit('stage_change', payload.stage);
-  });
-  state.on('ws:room_update', (payload) => state.applySync(payload));
-  state.on('ws:phase_change', (payload) => {
-    const phase = payload && payload.phase !== undefined ? payload.phase : payload;
-    state.setPhase(phase);
-  });
-  state.on('ws:player_joined', (p) => state.upsertPlayer(p));
-  state.on('ws:player_left', (p) => state.removePlayer(p && p.id !== undefined ? p.id : p));
-  state.on('ws:role_assigned', (payload) => {
-    const s = state.getState();
-    if (payload) {
-      s.role = payload.role !== undefined ? payload.role : payload;
-      s.trait = payload.trait !== undefined ? payload.trait : s.trait;
-    }
-    state.saveSession();
-    state.emit('role_assigned', payload);
-  });
-  state.on('ws:task', (payload) => {
-    state.getState().task = payload;
-    state.emit('task', payload);
-  });
-  state.on('ws:vote_result', (payload) => {
-    const s = state.getState();
-    if (payload && payload.tally) s.votes = payload.tally;
-    state.emit('vote_result', payload);
-  });
+function hideOverlay() {
+  const ov = document.getElementById('err-overlay');
+  if (ov) ov.hidden = true;
 }
 
-function mountGate() {
-  const screen = document.getElementById('screen');
+// ---------- session lifecycle ----------
+function exitToGate(notice) {
+  hideOverlay();
+  ws.close();
+  router.stop();
+  state.clearSession();
+  state.reset();
+  mountGate(notice);
+}
+
+function leaveRoom() {
+  const id = state.getState().room && state.getState().room.id;
+  if (id) post(`/room/${encodeURIComponent(id)}/leave`, {}).catch(() => {}); // best effort
+  exitToGate();
+}
+
+function enterRoom(snapshot) {
+  hideOverlay();
+  state.applySession(snapshot);
+  router.boot(screenEl());
+  ws.connect(snapshot.room.id);
+}
+
+function wireEvents() {
+  state.bindServerEvents();
+  state.on('connection_status', (k) => { renderConnStatus(k); if (k === 'connected') hideOverlay(); });
+  state.on('connection_lost', showLostOverlay);
+  state.on('connection_fatal', ({ reason }) => exitToGate(
+    reason === 'room_gone' ? t('gate.room_gone') : t('gate.not_member')));
+  state.on('room_closed', () => { if (state.getState().room) exitToGate(t('gate.room_closed')); });
+  state.on('request_leave', leaveRoom);
+  state.on('notice', toast);
+  state.on('ws_send_failed', () => toast(t('conn.lost')));
+}
+
+function errText(err) {
+  if (err instanceof ApiError) {
+    if (err.status === 429) return t('gate.rate_limited');
+    if (err.status === 409) return t('gate.already_in');
+    if (err.status === 0) return t('conn.lost');
+  }
+  return err.message;
+}
+
+function mountGate(notice = '') {
+  ws.close();
+  const screen = screenEl();
   screen.innerHTML = '';
 
   const wrap = document.createElement('div');
@@ -100,14 +115,14 @@ function mountGate() {
 
     <div class="terminal-frame panel" style="width: 100%; max-width: 580px; margin: 0 auto; padding: 3.2rem;">
       <div class="mode-tabs" role="tablist">
-        <button class="mode-tab active" id="tab-join" role="tab" data-i18n="gate.join">Join by Code</button>
-        <button class="mode-tab" id="tab-host" role="tab" data-i18n="gate.host">Host a Room</button>
+        <button class="mode-tab active" id="tab-join" role="tab" type="button" data-i18n="gate.join">Join by Code</button>
+        <button class="mode-tab" id="tab-host" role="tab" type="button" data-i18n="gate.host">Host a Room</button>
       </div>
 
       <form id="gate-form" style="width: 100%; margin-top: 2rem;">
         <div class="field-group field">
           <label for="name" class="field-label" data-i18n="gate.name_label">Your Callsign</label>
-          <input type="text" id="name" name="name" maxlength="24" placeholder="Callsign" autocomplete="callsign">
+          <input type="text" id="name" name="name" maxlength="24" autocomplete="nickname">
         </div>
 
         <div class="field-collapse" id="code-group">
@@ -131,8 +146,8 @@ function mountGate() {
   const codeInput = form.elements.code;
   const submit = wrap.querySelector('#gate-submit');
   const errEl = wrap.querySelector('#gate-error');
-
-  form.elements.name.placeholder = t("gate.name_placeholder")
+  errEl.textContent = notice;
+  form.elements.name.placeholder = t('gate.name_placeholder');
 
   function setMode(m) {
     mode = m;
@@ -146,10 +161,7 @@ function mountGate() {
   wrap.querySelector('#tab-join').addEventListener('click', () => setMode('join'));
 
   codeInput.addEventListener('input', (e) => {
-    e.target.value = e.target.value
-      .toUpperCase()
-      .replace(/[^0-9A-F]/g, '')
-      .slice(0, 6);
+    e.target.value = e.target.value.toUpperCase().replace(/[^0-9A-F]/g, '').slice(0, 6);
   });
 
   form.addEventListener('submit', async (e) => {
@@ -157,45 +169,20 @@ function mountGate() {
     errEl.textContent = '';
     submit.disabled = true;
     try {
-      const name = form.elements.name.value.trim();
-      const user_uuid = state.getOrCreateUserUUID();
-      let data;
-      if (mode === 'host') {
-        data = await api('/create', { method: 'POST', body: JSON.stringify({ user_uuid, user_name: name }) });
-      } else {
-        const room_code = codeInput.value.trim().toUpperCase();
-        data = await api('/join', {
-          method: 'POST',
-          body: JSON.stringify({ user_uuid, user_name: name, room_code }),
-        });
-      }
-      if (!data?.room?.id) throw new Error("Invalid server response, try again")
+      const user_name = form.elements.name.value.trim();
+      const data = mode === 'host'
+        ? await post('/create', { user_name })
+        : await post('/join', { user_name, room_code: codeInput.value.trim().toUpperCase() });
+      if (!data?.room?.id) throw new Error('Invalid server response, try again');
+      state.reset();
+      // create: caller is the owner, so we know our player id before the ws `connect` event
+      if (mode === 'host') state.setSelf(data.room.owner_id);
       enterRoom(data);
     } catch (err) {
-      errEl.textContent = t('gate.error') + ': ' + err.message;
+      errEl.textContent = `${t('gate.error')}: ${errText(err)}`;
       submit.disabled = false;
     }
   });
-}
-
-async function enterRoom(session) {
-  const s = state.getState();
-  s.room = session.room;
-  s.session = session;
-  s.players = session.room.users ? session.room.users.map(id => ({ id })) : [];
-  state.saveSession();
-
-  const user_uuid = state.getOrCreateUserUUID();
-  const roomId = s.room.id;
-
-  try {
-    wireEvents();
-    router.boot(document.getElementById('screen'));
-    ws.connect(roomId);
-  } catch (err) {
-    showErrOverlay('conn.ws_init_error', err);
-    mountGate();
-  }
 }
 
 async function boot() {
@@ -203,27 +190,23 @@ async function boot() {
   hydrate(document.body);
 
   const langLink = document.getElementById('lang-switch');
-  if (langLink) {
-    langLink.href = localeSwitchHref(langLink.dataset.locale);
-  }
+  if (langLink) langLink.href = localeSwitchHref(langLink.dataset.locale);
 
   renderConnStatus('offline');
-  state.on('connection_status', renderConnStatus);
-  state.on('connection_lost', () => showErrOverlay("conn.lost", "conn.lost_hint"));
+  wireEvents();
 
+  // Resume after reload: fatal -> back to gate
   const saved = state.loadSession();
-  if (saved && saved.room) {
-    state.getState().room = saved.room;
-    if (saved.session) {
-      enterRoom(saved.session);
-      return;
-    }
+  if (saved && saved.room && saved.room.id) {
+    state.setSelf(saved.selfId);
+    enterRoom({ room: saved.room });
+    return;
   }
   mountGate();
 }
 
 boot().catch((err) => {
   console.error('charlatan boot failed', err);
-  const screen = document.getElementById('screen');
+  const screen = screenEl();
   if (screen) screen.innerHTML = `<p class="waiting">${t('gate.error')}</p>`;
 });
