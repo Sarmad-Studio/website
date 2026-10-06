@@ -1,22 +1,20 @@
 import { on, getState } from './state.js';
 import lobby from './screens/lobby.js';
 
-const ROUTES = {
-  lobby: lobby,
-  initial: lobby,
-};
+const ROUTES = { lobby };
 
 let currentKey = null;
 let currentScreen = null;
 let container = null;
 
-function resolveKey() {
+// `initial` shares the lobby.
+export function resolveKey() {
   const s = getState();
   const phase = s.session && s.session.phase;
+  if (phase === 'initial') return 'lobby';
   if (phase && ROUTES[phase]) return phase;
-  const stage = (s.room && s.room.stage) || (s.session && s.session.stage);
-  if (stage && ROUTES[stage]) return stage;
-  return 'lobby';
+  const stage = s.room && s.room.stage;
+  return stage === 'ended' ? 'ended' : 'lobby';
 }
 
 export function swap(key) {
