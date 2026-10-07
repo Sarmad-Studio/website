@@ -195,9 +195,9 @@ async function boot() {
 
   // Resume after reload: fatal -> back to gate
   const saved = state.loadSession();
-  if (saved && saved.room && saved.room.id) {
-    state.setSelf(saved.selfId);
-    enterRoom({ room: saved.room });
+  if (saved?.session?.room?.id && saved?.self?.user?.id) {
+    state.setSelf(saved.self.user.id);
+    enterRoom({ room: saved.session.room });
     return;
   }
   mountGate();
