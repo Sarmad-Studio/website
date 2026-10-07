@@ -46,10 +46,10 @@ export function resetState() {
 
 export function saveSession() {
   try {
-    const room = state.session.room
-    if (!room) return;
+    const session = state.session
+    if (!session) return;
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({
-      room,
+      session,
       self: { user: { id: state.self.user.id, created_at: state.self.user.created_at }, name: state.self.name },
     }));
   } catch (_) { /* storage unavailable */ }
