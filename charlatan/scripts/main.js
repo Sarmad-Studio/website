@@ -196,6 +196,7 @@ async function boot() {
   const saved = state.loadSession();
   if (saved?.session?.room?.id && saved?.self?.user?.id) {
     state.setSelf(saved.self.user.id);
+    state.setSelfName(saved.self.name)
     enterRoom(saved.session);
     return;
   }
