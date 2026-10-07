@@ -189,8 +189,9 @@ async function boot() {
   const langLink = document.getElementById('lang-switch');
   if (langLink) langLink.href = localeSwitchHref(langLink.dataset.locale);
 
-  renderConnStatus('offline');
   wireEvents();
+  renderConnStatus('offline');
+
   // Resume after reload: fatal -> back to gate
   const saved = state.loadSession();
   if (saved?.session?.room?.id && saved?.self?.user?.id) {
