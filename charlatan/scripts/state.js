@@ -99,7 +99,7 @@ export function applySession(sess) {
 
 export function setSelf(id) {
   if (id === state.self.user.id) return;
-  state.self.user.id = id;
+  state.self.user.id = id ?? null;
   refreshSelf();
   saveSession();
   emit('self', state.self.user.id);
