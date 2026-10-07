@@ -56,7 +56,6 @@ function hideOverlay() {
   if (ov) ov.hidden = true;
 }
 
-// ---------- session lifecycle ----------
 function exitToGate(notice) {
   hideOverlay();
   ws.close();
