@@ -168,13 +168,13 @@ function mountGate(notice = '') {
     submit.disabled = true;
     try {
       const user_name = form.elements.name.value.trim();
-      const data = mode === 'host'
+      const session = mode === 'host'
         ? await post('/create', { user_name })
         : await post('/join', { user_name, room_code: codeInput.value.trim().toUpperCase() });
-      if (!data?.room?.id) throw new Error('Invalid server response, try again');
+      if (!session?.room?.id) throw new Error('Invalid server response, try again');
       state.resetState();
-      if (mode === 'host') state.setSelf(data.room.owner_id);
-      enterRoom(data);
+      if (mode === 'host') state.setSelf(session.room.owner_id);
+      enterRoom(session);
     } catch (err) {
       errEl.textContent = `${t('gate.error')}: ${errText(err)}`;
       submit.disabled = false;
