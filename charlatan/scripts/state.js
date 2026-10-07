@@ -122,7 +122,7 @@ export function removePlayer(id) {
 }
 
 function setPhase(phase) {
-  if (phase === undefined) return;
+  if (!phase) return;
   state.session.phase = phase;
   if (phase !== 'mission') state.task = null;
   if (phase === 'voting') { state.votes = null; state.ejected = []; }
