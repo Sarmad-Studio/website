@@ -47,7 +47,7 @@ export function resetState() {
 export function saveSession() {
   try {
     const session = state.session
-    if (!session) return;
+    if (!session.room?.id) return;
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({
       session,
       self: { user: { id: state.self.user.id, created_at: state.self.user.created_at }, name: state.self.name },
