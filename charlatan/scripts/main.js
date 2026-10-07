@@ -66,8 +66,8 @@ function exitToGate(notice) {
 }
 
 function leaveRoom() {
-  const id = state.getState().room && state.getState().room.id;
-  if (id) post(`/room/${encodeURIComponent(id)}/leave`, {}).catch(() => {}); // best effort
+  const id = state.getState().session.room?.id;
+  if (id) post(`/room/${encodeURIComponent(id)}/leave`, {}).catch(() => { }); // best effort
   exitToGate();
 }
 
