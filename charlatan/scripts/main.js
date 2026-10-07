@@ -191,7 +191,6 @@ async function boot() {
 
   renderConnStatus('offline');
   wireEvents();
-
   // Resume after reload: fatal -> back to gate
   const saved = state.loadSession();
   if (saved?.session?.room?.id && saved?.self?.user?.id) {
