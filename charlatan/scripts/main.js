@@ -82,9 +82,8 @@ function wireEvents() {
   state.bindServerEvents();
   state.on('connection_status', (k) => { renderConnStatus(k); if (k === 'connected') hideOverlay(); });
   state.on('connection_lost', showLostOverlay);
-  state.on('connection_fatal', ({ reason }) => exitToGate(
-    reason === 'room_gone' ? t('gate.room_gone') : t('gate.not_member')));
-  state.on('room_closed', () => { if (state.getState().room) exitToGate(t('gate.room_closed')); });
+  state.on('connection_fatal', ({ reason }) => exitToGate(reason === 'room_gone' ? t('gate.room_gone') : t('gate.not_member')));
+  state.on('room_closed', () => { if (state.getState().session.room) exitToGate(t('gate.room_closed')); });
   state.on('request_leave', leaveRoom);
   state.on('notice', toast);
   state.on('ws_send_failed', () => toast(t('conn.lost')));
@@ -197,7 +196,7 @@ async function boot() {
   const saved = state.loadSession();
   if (saved?.session?.room?.id && saved?.self?.user?.id) {
     state.setSelf(saved.self.user.id);
-    enterRoom({ room: saved.session.room });
+    enterRoom(saved.session);
     return;
   }
   mountGate();
