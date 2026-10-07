@@ -135,7 +135,7 @@ export function bindServerEvents() {
   if (bound) return;
   bound = true;
 
-  on('ws:connect', (p) => setSelf(p && p.player_id));
+  on('ws:connect', (p) => setSelf(p?.player_id));
 
   on('ws:session_state_sync', (p) => {
     if (!p) return;
