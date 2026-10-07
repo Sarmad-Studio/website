@@ -105,6 +105,10 @@ export function setSelf(id) {
   emit('self', state.self.user.id);
 }
 
+export function setSelfName(name) {
+  state.self.name = name ?? ""
+}
+
 export function upsertPlayer(raw) {
   const p = normPlayer(raw);
   if (!p) return;
