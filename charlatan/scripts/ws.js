@@ -20,7 +20,6 @@ const EPOCH = 1712793600000n;      // Spirit Epoch 2024-4-11
 let sock = null;
 let roomId = null;
 let wantOpen = false;
-let fetching = false;
 let gen = 0;                       // invalidates in-flight open() calls
 let deadline = 0;
 let attempts = 0;
@@ -105,18 +104,15 @@ async function open() {
   setStatus('connecting');
 
   let ticket;
-  fetching = true;
   try {
     ticket = (await post(`/room/${encodeURIComponent(roomId)}/ws-ticket`, {})).ticket;
   } catch (err) {
     if (my !== gen) return;
-    fetching = false;
     if (err instanceof ApiError && [400, 401, 403, 404].includes(err.status)) {
       return fatal(err.status === 404 ? 'room_gone' : 'not_member');
     }
     return retry(); // network, 429, 5xx
   }
-  fetching = false;
   if (my !== gen || !wantOpen) return;
   if (!ticket) return retry();
 
