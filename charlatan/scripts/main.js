@@ -61,7 +61,7 @@ function exitToGate(notice) {
   ws.close();
   router.stop();
   state.clearSession();
-  state.reset();
+  state.resetState();
   mountGate(notice);
 }
 
@@ -173,7 +173,7 @@ function mountGate(notice = '') {
         ? await post('/create', { user_name })
         : await post('/join', { user_name, room_code: codeInput.value.trim().toUpperCase() });
       if (!data?.room?.id) throw new Error('Invalid server response, try again');
-      state.reset();
+      state.resetState();
       // create: caller is the owner, so we know our player id before the ws `connect` event
       if (mode === 'host') state.setSelf(data.room.owner_id);
       enterRoom(data);

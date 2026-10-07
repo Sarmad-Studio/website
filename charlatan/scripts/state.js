@@ -40,7 +40,7 @@ export const getState = () => state;
 
 export const findPlayer = (id) => state.players.find((p) => (p.user.id) === id) || null;
 
-export function reset() {
+export function resetState() {
   Object.assign(state, blank());
 }
 
