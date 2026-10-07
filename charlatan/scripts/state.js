@@ -39,7 +39,7 @@ export function emit(event, data) {
 
 export const getState = () => state;
 
-export const findPlayer = (id) => state.players.find((p) => p.id === String(id)) || null;
+export const findPlayer = (id) => state.players.find((p) => (p.user.id) === id) || null;
 
 export function reset() {
   Object.assign(state, blank());
@@ -64,13 +64,11 @@ export function clearSession() {
   try { sessionStorage.removeItem(SESSION_KEY); } catch (_) { /* noop */ }
 }
 
-function normPlayer(p) {
-  if (p == null) return null;
-  if (typeof p !== 'object') return { id: String(p) };
-  const id = p.id ?? p.user?.id ?? p.player_id;
-  if (id == null) return null;
-  return { ...p, id: String(id), name: p.name ?? p.user_name ?? '' };
-}
+const normPlayer = (p) => p && {
+  user: { id: p.user.id, created_at: p.user.created_at },
+  name: p.name,
+  connected: p.connected ?? true,
+};
 
 function normRoom(r) {
   return {
@@ -111,19 +109,17 @@ export function setSelf(id) {
 export function upsertPlayer(raw) {
   const p = normPlayer(raw);
   if (!p) return;
-  const i = state.players.findIndex((x) => x.id === p.id);
-  if (i >= 0) state.players[i] = { ...state.players[i], ...p };
-  else state.players.push(p);
+  const i = state.players.findIndex((x) => x.user.id === p.user.id);
+  if (i < 0) state.players.push(p);
+  else state.players[i] = p;
   refreshSelf();
-  emit('players_update', state.players);
+  emit('players_update', [...state.players]);
 }
 
 export function removePlayer(id) {
-  id = String(id);
-  state.players = state.players.filter((p) => p.id !== id);
-  if (state.room) state.room.users = state.room.users.filter((u) => u !== id);
+  state.players = state.players.filter((p) => p.user.id !== id);
   refreshSelf();
-  emit('players_update', state.players);
+  emit('players_update', [...state.players]);
 }
 
 function setPhase(phase) {
@@ -145,11 +141,8 @@ export function bindServerEvents() {
   on('ws:session_state_sync', (p) => {
     if (!p) return;
     applySession(p.session);
-    if (Array.isArray(p.players)) {
-      state.players = p.players.map(normPlayer).filter(Boolean);
-      state.synced = true;
-      refreshSelf();
-    }
+    if (Array.isArray(p.players)) state.players = p.players.map(normPlayer).filter(Boolean);
+    refreshSelf();
     emit('state_sync', p);
     emit('phase_change', state.session.phase);
   });
@@ -157,9 +150,11 @@ export function bindServerEvents() {
   on('ws:player_joined', (p) => upsertPlayer({ ...(p && p.player), connected: true }));
   on('ws:player_left', (p) => p && removePlayer(p.player_id));
   on('ws:disconnect', (p) => {
-    if (!p || String(p.player_id) === state.selfId) return;
+    if (!p || p.player_id === state.self.user.id) return;
     const pl = findPlayer(p.player_id);
-    if (pl) upsertPlayer({ id: pl.id, connected: false });
+    if (!pl) return;
+    pl.connected = false;
+    emit('players_update', [...state.players]);
   });
   on('ws:owner_changed', (p) => {
     if (!p?.owner_id || !state.session.room) return;
@@ -179,7 +174,7 @@ export function bindServerEvents() {
   on('ws:vote_result', (p) => {
     if (!p) return;
     state.votes = p.tally ?? null;
-    state.ejected = (p.ejected || []).map(String);
+    state.ejected = p.ejected || [];
     emit('vote_result', p);
   });
 
