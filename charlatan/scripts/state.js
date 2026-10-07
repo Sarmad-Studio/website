@@ -143,7 +143,7 @@ export function bindServerEvents() {
     if (Array.isArray(p.players)) state.players = p.players.map(normPlayer).filter(Boolean);
     refreshSelf();
     emit('state_sync', p);
-    emit('phase_change', state.session.phase);
+    setPhase(state.session.phase);
   });
 
   on('ws:player_joined', (p) => upsertPlayer({ ...(p && p.player), connected: true }));
