@@ -8,8 +8,7 @@ const blank = () => ({
     phase: 'initial',
   },
   players: [],    // [{ user: { id, created_at }, name, connected }]
-  selfId: null,   // snowflake player id (from `connect` / room.owner_id on create)
-  self: null,     // player object for this client (derived from selfId + players)
+  self: { user: { id: null, created_at: null }, name: "", connected: true },
   role: null,
   trait: null,
   mission: null,
@@ -51,7 +50,7 @@ export function saveSession() {
     if (!room) return;
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({
       room,
-      selfId: state.selfId,
+      self: { user: { id: state.self.user.id, created_at: state.self.user.created_at }, name: state.self.name },
     }));
   } catch (_) { /* storage unavailable */ }
 }
@@ -83,7 +82,7 @@ function normRoom(r) {
 }
 
 function refreshSelf() {
-  state.self = state.selfId ? findPlayer(state.selfId) || { id: state.selfId } : null;
+  state.self = state.self.user.id ? findPlayer(state.self.user.id) || state.self : null;
 }
 
 // Accepts a Session snapshot: { room, started_at, phase }
@@ -99,11 +98,11 @@ export function applySession(sess) {
 }
 
 export function setSelf(id) {
-  if (id == null) return;
-  state.selfId = String(id);
+  if (id === state.self.user.id) return;
+  state.self.user.id = id;
   refreshSelf();
   saveSession();
-  emit('self', state.selfId);
+  emit('self', state.self.user.id);
 }
 
 export function upsertPlayer(raw) {
