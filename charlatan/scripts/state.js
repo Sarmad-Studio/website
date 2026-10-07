@@ -2,10 +2,12 @@ const SESSION_KEY = 'charlatan.session';
 const UUID_KEY = 'charlatan.user_uuid';
 
 const blank = () => ({
-  room: null,     // { id, join_code, stage, owner_id, max_users, users }
-  session: { phase: 'initial', started_at: null }, // Session minus room (room lives in state.room)
-  players: [],    // [{ id, name, connected }]
-  synced: false,  // got a full session_state_sync on this connection lifetime
+  session: {
+    room: null, // { id, join_code, created_at, stage, visibility, owner_id, max_users }
+    started_at: null,
+    phase: 'initial',
+  },
+  players: [],    // [{ user: { id, created_at }, name, connected }]
   selfId: null,   // snowflake player id (from `connect` / room.owner_id on create)
   self: null,     // player object for this client (derived from selfId + players)
   role: null,
@@ -45,9 +47,10 @@ export function reset() {
 
 export function saveSession() {
   try {
-    if (!state.room) return;
+    const room = state.session.room
+    if (!room) return;
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({
-      room: { id: state.room.id, join_code: state.room.join_code },
+      room,
       selfId: state.selfId,
     }));
   } catch (_) { /* storage unavailable */ }
@@ -71,10 +74,13 @@ function normPlayer(p) {
 
 function normRoom(r) {
   return {
-    ...r,
-    id: String(r.id),
-    owner_id: r.owner_id != null ? String(r.owner_id) : null,
-    users: (r.users || []).map(String),
+    id: r.id,
+    join_code: r.join_code,
+    created_at: r.created_at,
+    stage: r.stage,
+    visibility: r.visibility,
+    owner_id: r.owner_id,
+    max_users: r.max_users,
   };
 }
 
@@ -85,14 +91,11 @@ function refreshSelf() {
 // Accepts a Session snapshot: { room, started_at, phase }
 export function applySession(sess) {
   if (!sess) return;
-  if (sess.room) {
-    state.room = normRoom(sess.room);
-    if (!state.synced && state.room.users.length) {
-      state.players = state.room.users.map((id) => ({ id, name: '' }));
-    }
+  state.session = {
+    room: normRoom(sess.room),
+    started_at: sess.started_at,
+    phase: sess.phase
   }
-  if (sess.phase !== undefined) state.session.phase = sess.phase;
-  if (sess.started_at !== undefined) state.session.started_at = sess.started_at;
   refreshSelf();
   saveSession();
 }
@@ -159,11 +162,12 @@ export function bindServerEvents() {
     if (pl) upsertPlayer({ id: pl.id, connected: false });
   });
   on('ws:owner_changed', (p) => {
-    if (state.room && p) state.room.owner_id = String(p.owner_id);
-    emit('room_update', state.room);
+    if (!p?.owner_id || !state.session.room) return;
+    state.session.room.owner_id = p.owner_id;
+    emit('room_update', state.session.room);
   });
 
-  on('ws:phase_change', (p) => setPhase(p && p.phase !== undefined ? p.phase : p));
+  on('ws:phase_change', (p) => setPhase(p.phase));
   on('ws:mission_started', (p) => { state.mission = p && p.mission; emit('mission_started', p); });
   on('ws:role_assigned', (p) => {
     if (!p) return;
