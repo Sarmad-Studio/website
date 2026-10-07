@@ -158,7 +158,7 @@ async function open() {
 // Reopen now if we're not healthy (tab wake, network back)
 function nudge(force = false) {
   if (!wantOpen) return;
-  if (!force && (fetching || (sock && sock.readyState <= WebSocket.OPEN))) return;
+  if (!force && sock?.readyState <= WebSocket.OPEN) return;
   attempts = 0;
   open();
 }
