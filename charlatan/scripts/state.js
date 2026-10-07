@@ -82,7 +82,7 @@ function normRoom(r) {
 }
 
 function refreshSelf() {
-  state.self = state.self.user.id ? findPlayer(state.self.user.id) || state.self : null;
+  if (state.self.user.id) state.self = findPlayer(state.self.user.id) ?? state.self;
 }
 
 // Accepts a Session snapshot: { room, started_at, phase }
@@ -135,7 +135,7 @@ export function bindServerEvents() {
   if (bound) return;
   bound = true;
 
-  on('ws:connect', (p) => setSelf(p?.player_id));
+  on('ws:connect', (p) => setSelf(p && p.player_id));
 
   on('ws:session_state_sync', (p) => {
     if (!p) return;
